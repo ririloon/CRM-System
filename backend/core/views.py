@@ -19,12 +19,39 @@ from .models import Appointment
 from .serializers import AppointmentSerializer
 
 
-class PatientViewSet(viewsets.ModelViewSet):
-    queryset = Patient.objects.all().annotate(
-        appointments_count=Count("appointments")
-    ).order_by("-id")
-    serializer_class = PatientSerializer
 
+from .models import Patient, Doctor, Appointment
+from .serializers import (
+    PatientSerializer,
+    DoctorSerializer,
+    AppointmentSerializer,
+)
+
+from .serializers import PatientDetailSerializer
+
+class PatientViewSet(ModelViewSet):
+    queryset = Patient.objects.all()
+    serializer_class = PatientSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = super().get_queryset()
+
+        if not hasattr(user, "userprofile"):
+            return qs.none()
+
+        role = user.userprofile.role
+
+        if role == "admin":
+            return qs.order_by("id")
+
+        # patient пока видит всех пациентов (потом можно сузить)
+        if role == "patient":
+            return qs.order_by("id")
+
+        return qs.none()
+    
     @action(detail=True, methods=["get"])
     def details(self, request, pk=None):
         patient = self.get_object()
@@ -32,9 +59,28 @@ class PatientViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class DoctorViewSet(viewsets.ModelViewSet):
-    queryset = Doctor.objects.all().order_by("name")
+class DoctorViewSet(ModelViewSet):
+    queryset = Doctor.objects.all()
     serializer_class = DoctorSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = super().get_queryset()
+
+        if not hasattr(user, "userprofile"):
+            return qs.none()
+
+        role = user.userprofile.role
+
+        if role == "admin":
+            return qs.order_by("id")
+
+        if role == "patient":
+            # пациентам можно показывать всех врачей
+            return qs.order_by("id")
+
+        return qs.none()
 
 
 class AppointmentViewSet(ModelViewSet):
@@ -46,18 +92,16 @@ class AppointmentViewSet(ModelViewSet):
         user = self.request.user
         qs = super().get_queryset()
 
-        # Если нет профиля — ничего не отдаём
         if not hasattr(user, "userprofile"):
             return qs.none()
 
         role = user.userprofile.role
 
-        # Admin видит всё
         if role == "admin":
             return qs.order_by("date")
 
-        # Patient — пока видит все записи (мы позже можем сузить)
         if role == "patient":
+            # позже можно будет сузить до своих приёмов
             return qs.order_by("date")
 
         return qs.none()

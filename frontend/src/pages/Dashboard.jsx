@@ -17,6 +17,7 @@ import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlin
 import LocalHospitalOutlinedIcon from "@mui/icons-material/LocalHospitalOutlined";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import api from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 const glassCardSx = {
   background: "rgba(255, 255, 255, 0.62)",
@@ -38,12 +39,22 @@ const softPanelSx = {
 
 function Dashboard() {
   const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     api
       .get("dashboard/")
-      .then((res) => setData(res.data))
-      .catch((err) => console.error(err));
+      .then((res) => {
+        setData(res.data);
+        setError("");
+      })
+      .catch((err) => {
+        console.error("dashboard error:", err);
+        setError("Failed to load dashboard data");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const getStatusColor = (status) => {
@@ -60,6 +71,22 @@ function Dashboard() {
         return "default";
     }
   };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ mt: 4, px: 3 }}>
+        <Typography color="error">{error}</Typography>
+      </Box>
+    );
+  }
 
   if (!data) {
     return (
@@ -179,7 +206,7 @@ function Dashboard() {
                 color: "#0f172a",
               }}
             >
-               Dashboard
+              Dashboard
             </Typography>
 
             <Typography
@@ -199,6 +226,7 @@ function Dashboard() {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
+              onClick={() => navigate("/appointments")}
               sx={{
                 borderRadius: 3,
                 boxShadow: "none",
@@ -211,12 +239,13 @@ function Dashboard() {
 
             <Button
               variant="outlined"
+              disabled
               sx={{
                 borderRadius: 3,
                 px: 2.2,
                 py: 1.1,
                 borderColor: "rgba(15, 23, 42, 0.10)",
-                color: "#0f172a",
+                color: "#94a3b8",
                 backgroundColor: "rgba(255,255,255,0.35)",
               }}
             >
@@ -238,16 +267,10 @@ function Dashboard() {
             >
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
-                  <Typography
-                    variant="body2"
-                    sx={{ color: "#64748b", mb: 1 }}
-                  >
+                  <Typography variant="body2" sx={{ color: "#64748b", mb: 1 }}>
                     {card.title}
                   </Typography>
-                  <Typography
-                    variant="h4"
-                    sx={{ fontWeight: 800, color: "#0f172a" }}
-                  >
+                  <Typography variant="h4" sx={{ fontWeight: 800, color: "#0f172a" }}>
                     {card.value}
                   </Typography>
                 </Box>
@@ -368,9 +391,7 @@ function Dashboard() {
 
             {data.recent_appointments.length === 0 ? (
               <Box sx={{ px: 3, py: 4 }}>
-                <Typography color="text.secondary">
-                  No appointments yet
-                </Typography>
+                <Typography color="text.secondary">No appointments yet</Typography>
               </Box>
             ) : (
               data.recent_appointments.map((item, index) => (
@@ -525,6 +546,7 @@ function Dashboard() {
               <Button
                 variant="contained"
                 fullWidth
+                onClick={() => navigate("/patients")}
                 sx={{
                   borderRadius: 3,
                   py: 1.2,
@@ -537,6 +559,7 @@ function Dashboard() {
               <Button
                 variant="outlined"
                 fullWidth
+                onClick={() => navigate("/doctors")}
                 sx={{
                   borderRadius: 3,
                   py: 1.2,
@@ -551,6 +574,7 @@ function Dashboard() {
               <Button
                 variant="outlined"
                 fullWidth
+                onClick={() => navigate("/appointments")}
                 sx={{
                   borderRadius: 3,
                   py: 1.2,
@@ -569,4 +593,4 @@ function Dashboard() {
   );
 }
 
-export default Dashboard;
+export default Dashboard; 

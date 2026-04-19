@@ -17,6 +17,7 @@ import CakeOutlinedIcon from "@mui/icons-material/CakeOutlined";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import NotesOutlinedIcon from "@mui/icons-material/NotesOutlined";
+import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
 import api from "../services/api";
 import { useParams } from "react-router-dom";
