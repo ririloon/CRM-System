@@ -17,6 +17,7 @@ import AddIcon from "@mui/icons-material/Add";
 import CakeOutlinedIcon from "@mui/icons-material/CakeOutlined";
 import { DataGrid } from "@mui/x-data-grid";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
+import { InputAdornment } from "@mui/material";
 import NotesOutlinedIcon from "@mui/icons-material/NotesOutlined";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
@@ -66,6 +67,25 @@ const tableSx = {
   },
 };
 
+const formFieldSx = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 3,
+    backgroundColor: "#ffffff",
+  },
+  "& .MuiInputLabel-root": {
+    color: "#64748b",
+  },
+  "& .MuiOutlinedInput-notchedOutline": {
+    borderColor: "rgba(148, 163, 184, 0.24)",
+  },
+  "&:hover .MuiOutlinedInput-notchedOutline": {
+    borderColor: "rgba(100, 116, 139, 0.38)",
+  },
+  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+    borderColor: "#2563eb",
+  },
+};
+
 function Patients() {
   const [patients, setPatients] = useState([]);
   const [search, setSearch] = useState("");
@@ -82,7 +102,8 @@ function Patients() {
   const navigate = useNavigate();
 
   const loadPatients = useCallback(() => {
-    api.get("patients/")
+    api
+      .get("patients/")
       .then((res) => setPatients(res.data))
       .catch((err) => console.error(err));
   }, []);
@@ -92,7 +113,8 @@ function Patients() {
   }, [loadPatients]);
 
   const handleCreate = () => {
-    api.post("patients/", form)
+    api
+      .post("patients/", form)
       .then(() => {
         setOpen(false);
         setForm({
@@ -109,14 +131,17 @@ function Patients() {
 
   const filteredRows = useMemo(() => {
     return patients.filter((patient) => {
-      const text = `${patient.name} ${patient.phone || ""} ${patient.email || ""} ${patient.notes || ""}`.toLowerCase();
+      const text =
+        `${patient.name} ${patient.phone || ""} ${patient.email || ""} ${patient.notes || ""}`.toLowerCase();
       return text.includes(search.toLowerCase());
     });
   }, [patients, search]);
 
   const totalPatients = patients.length;
   const withEmail = patients.filter((p) => p.email).length;
-  const withVisits = patients.filter((p) => (p.appointments_count || 0) > 0).length;
+  const withVisits = patients.filter(
+    (p) => (p.appointments_count || 0) > 0,
+  ).length;
 
   const columns = [
     { field: "id", headerName: "ID", width: 80 },
@@ -126,7 +151,14 @@ function Patients() {
       flex: 1.2,
       minWidth: 180,
       renderCell: (params) => (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.2, height: "100%" }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.2,
+            height: "100%",
+          }}
+        >
           <Box
             sx={{
               width: 34,
@@ -135,7 +167,8 @@ function Patients() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: "linear-gradient(135deg, rgba(15,118,110,0.14), rgba(37,99,235,0.12))",
+              background:
+                "linear-gradient(135deg, rgba(15,118,110,0.14), rgba(37,99,235,0.12))",
               color: "#0f766e",
               fontWeight: 700,
               fontSize: 13,
@@ -233,7 +266,8 @@ function Patients() {
             width: 220,
             height: 220,
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(37,99,235,0.15), transparent 65%)",
+            background:
+              "radial-gradient(circle, rgba(37,99,235,0.15), transparent 65%)",
             pointerEvents: "none",
           }}
         />
@@ -245,7 +279,8 @@ function Patients() {
             width: 200,
             height: 200,
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(15,118,110,0.16), transparent 65%)",
+            background:
+              "radial-gradient(circle, rgba(15,118,110,0.16), transparent 65%)",
             pointerEvents: "none",
           }}
         />
@@ -452,16 +487,17 @@ function Patients() {
         PaperProps={{
           sx: {
             borderRadius: 4,
-            background: "rgba(255,255,255,0.88)",
+            background: "rgba(255,255,255,0.92)",
             backdropFilter: "blur(18px)",
             WebkitBackdropFilter: "blur(18px)",
-            border: "1px solid rgba(255,255,255,0.65)",
+            border: "1px solid rgba(255,255,255,0.7)",
             boxShadow: "0 18px 40px rgba(15, 23, 42, 0.10)",
+            overflow: "hidden",
           },
         }}
       >
-        <DialogTitle sx={{ pb: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        <DialogTitle sx={{ px: 3, pt: 3, pb: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0f172a" }}>
             Add New Patient
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b", mt: 0.5 }}>
@@ -469,19 +505,23 @@ function Patients() {
           </Typography>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 2 }}>
-          <Grid container spacing={2}>
+        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+          <Grid container spacing={2.2}>
             <Grid item xs={12}>
               <TextField
                 label="Patient name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 fullWidth
+                sx={formFieldSx}
                 InputProps={{
                   startAdornment: (
-                    <Box sx={{ mr: 1, display: "flex", color: "#64748b" }}>
-                      <PeopleAltOutlinedIcon fontSize="small" />
-                    </Box>
+                    <InputAdornment position="start">
+                      <PeopleAltOutlinedIcon
+                        fontSize="small"
+                        sx={{ color: "#64748b" }}
+                      />
+                    </InputAdornment>
                   ),
                 }}
               />
@@ -493,11 +533,15 @@ function Patients() {
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 fullWidth
+                sx={formFieldSx}
                 InputProps={{
                   startAdornment: (
-                    <Box sx={{ mr: 1, display: "flex", color: "#64748b" }}>
-                      <PhoneOutlinedIcon fontSize="small" />
-                    </Box>
+                    <InputAdornment position="start">
+                      <PhoneOutlinedIcon
+                        fontSize="small"
+                        sx={{ color: "#64748b" }}
+                      />
+                    </InputAdornment>
                   ),
                 }}
               />
@@ -509,29 +553,44 @@ function Patients() {
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 fullWidth
+                sx={formFieldSx}
                 InputProps={{
                   startAdornment: (
-                    <Box sx={{ mr: 1, display: "flex", color: "#64748b" }}>
-                      <EmailOutlinedIcon fontSize="small" />
-                    </Box>
+                    <InputAdornment position="start">
+                      <EmailOutlinedIcon
+                        fontSize="small"
+                        sx={{ color: "#64748b" }}
+                      />
+                    </InputAdornment>
                   ),
                 }}
               />
             </Grid>
 
             <Grid item xs={12}>
+              <Typography
+                variant="body2"
+                sx={{ color: "#64748b", mb: 0.8, fontWeight: 500 }}
+              >
+                Birth date
+              </Typography>
+
               <TextField
-                label="Birth date"
                 type="date"
                 value={form.birth_date}
-                onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, birth_date: e.target.value })
+                }
                 fullWidth
-                InputLabelProps={{ shrink: true }}
+                sx={formFieldSx}
                 InputProps={{
                   startAdornment: (
-                    <Box sx={{ mr: 1, display: "flex", color: "#64748b" }}>
-                      <CakeOutlinedIcon fontSize="small" />
-                    </Box>
+                    <InputAdornment position="start">
+                      <CakeOutlinedIcon
+                        fontSize="small"
+                        sx={{ color: "#64748b" }}
+                      />
+                    </InputAdornment>
                   ),
                 }}
               />
@@ -544,20 +603,20 @@ function Patients() {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 fullWidth
                 multiline
-                rows={3}
+                rows={4}
+                sx={formFieldSx}
                 InputProps={{
                   startAdornment: (
-                    <Box
-                      sx={{
-                        mr: 1,
-                        mt: 1,
-                        display: "flex",
-                        alignSelf: "flex-start",
-                        color: "#64748b",
-                      }}
-                    >
-                      <NotesOutlinedIcon fontSize="small" />
-                    </Box>
+                    <InputAdornment position="start">
+                      <NotesOutlinedIcon
+                        fontSize="small"
+                        sx={{
+                          color: "#64748b",
+                          alignSelf: "flex-start",
+                          mt: 0.8,
+                        }}
+                      />
+                    </InputAdornment>
                   ),
                 }}
               />
@@ -565,12 +624,13 @@ function Patients() {
           </Grid>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5 }}>
           <Button
             onClick={() => setOpen(false)}
             sx={{
               borderRadius: 3,
               color: "#475569",
+              px: 2,
             }}
           >
             Cancel

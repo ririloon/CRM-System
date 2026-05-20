@@ -125,9 +125,18 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "ru"
+TIME_ZONE = "Asia/Bishkek"
 
-TIME_ZONE = 'UTC'
+LANGUAGES = [
+    ("ru", "Russian"),
+    ("ky", "Kyrgyz"),
+    ("en", "English"),
+]
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 
 USE_I18N = True
 

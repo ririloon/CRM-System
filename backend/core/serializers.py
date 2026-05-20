@@ -1,10 +1,17 @@
 from rest_framework import serializers
-from .models import Patient, Doctor, Appointment
+from .models import (
+    Patient,
+    Doctor,
+    Appointment,
+    DoctorSchedule,
+    VisitRecord,
+    Prescription,
+    MedicalDocument,
+    NotificationLog,
+)
 
 
 class PatientSerializer(serializers.ModelSerializer):
-    appointments_count = serializers.IntegerField(read_only=True)
-
     class Meta:
         model = Patient
         fields = [
@@ -13,49 +20,164 @@ class PatientSerializer(serializers.ModelSerializer):
             "phone",
             "email",
             "birth_date",
+            "gender",
+            "address",
+            "emergency_contact_name",
+            "emergency_contact_phone",
+            "allergies",
+            "chronic_conditions",
             "notes",
-            "appointments_count",
         ]
 
 
 class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
-        fields = ["id", "name", "specialization", "phone", "email"]
+        fields = [
+            "id",
+            "name",
+            "specialization",
+            "phone",
+            "email",
+            "license_number",
+            "experience_years",
+            "bio",
+            "is_available_online",
+        ]
 
 
-class AppointmentSerializer(serializers.ModelSerializer):
+class DoctorScheduleSerializer(serializers.ModelSerializer):
+    doctor = serializers.StringRelatedField()
+
+    class Meta:
+        model = DoctorSchedule
+        fields = [
+            "id",
+            "doctor",
+            "day_of_week",
+            "start_time",
+            "end_time",
+            "slot_duration",
+            "is_active",
+        ]
+
+
+class AppointmentListSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source="patient.name", read_only=True)
     doctor_name = serializers.CharField(source="doctor.name", read_only=True)
-    doctor_specialization = serializers.CharField(source="doctor.specialization", read_only=True)
 
     class Meta:
         model = Appointment
         fields = [
             "id",
             "patient",
+            "patient_name",
             "doctor",
+            "doctor_name",
+            "date",
+            "status",
+            "booking_source",
+        ]
+
+
+class AppointmentDetailSerializer(serializers.ModelSerializer):
+    patient = PatientSerializer(read_only=True)
+    patient_id = serializers.PrimaryKeyRelatedField(
+        queryset=Patient.objects.all(),
+        source="patient",
+        write_only=True,
+    )
+    doctor = DoctorSerializer(read_only=True)
+    doctor_id = serializers.PrimaryKeyRelatedField(
+        queryset=Doctor.objects.all(),
+        source="doctor",
+        write_only=True,
+    )
+
+    class Meta:
+        model = Appointment
+        fields = [
+            "id",
+            "patient",
+            "patient_id",
+            "doctor",
+            "doctor_id",
             "date",
             "status",
             "complaint",
             "comment",
-            "patient_name",
-            "doctor_name",
-            "doctor_specialization",
+            "booking_source",
+            "confirmation_sent",
+            "reminder_sent",
+            "created_at",
         ]
 
 
-class PatientDetailSerializer(serializers.ModelSerializer):
-    appointments = AppointmentSerializer(many=True, read_only=True)
-
+class PrescriptionSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Patient
+        model = Prescription
         fields = [
             "id",
-            "name",
-            "phone",
-            "email",
-            "birth_date",
-            "notes",
-            "appointments",
+            "medication_name",
+            "dosage",
+            "frequency",
+            "duration",
+            "instructions",
+        ]
+
+
+class VisitRecordSerializer(serializers.ModelSerializer):
+    patient = serializers.StringRelatedField(read_only=True)
+    doctor = serializers.StringRelatedField(read_only=True)
+    prescriptions = PrescriptionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = VisitRecord
+        fields = [
+            "id",
+            "appointment",
+            "patient",
+            "doctor",
+            "diagnosis",
+            "treatment_plan",
+            "doctor_notes",
+            "follow_up_date",
+            "created_at",
+            "prescriptions",
+        ]
+
+
+class MedicalDocumentSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source="patient.name", read_only=True)
+
+    class Meta:
+        model = MedicalDocument
+        fields = [
+            "id",
+            "patient",
+            "patient_name",
+            "visit_record",
+            "title",
+            "document_type",
+            "file",
+            "uploaded_at",
+        ]
+
+
+class NotificationLogSerializer(serializers.ModelSerializer):
+    appointment_info = serializers.CharField(
+        source="appointment.__str__",
+        read_only=True,
+    )
+
+    class Meta:
+        model = NotificationLog
+        fields = [
+            "id",
+            "appointment",
+            "appointment_info",
+            "channel",
+            "message_type",
+            "status",
+            "sent_at",
         ]

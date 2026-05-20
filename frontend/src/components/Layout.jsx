@@ -9,11 +9,13 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
   Paper,
   Toolbar,
   Typography,
 } from "@mui/material";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
@@ -25,7 +27,6 @@ import SearchIcon from "@mui/icons-material/Search";
 import { useState } from "react";
 
 const drawerWidth = 272;
-
 
 const menuItems = [
   { text: "Dashboard", icon: <DashboardOutlinedIcon />, path: "/" },
@@ -53,10 +54,40 @@ const glassTopbarSx = {
 
 function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuAnchor, setUserMenuAnchor] = useState(null);
+
+  const navigate = useNavigate();
 
   const handleDrawerToggle = () => {
     setMobileOpen((prev) => !prev);
   };
+
+  const handleOpenUserMenu = (event) => {
+    setUserMenuAnchor(event.currentTarget);
+  };
+
+  const handleCloseUserMenu = () => {
+    setUserMenuAnchor(null);
+  };
+
+  const handleLogout = () => {
+    // очищаем токен и роль (если хранишь роль)
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("userRole");
+    handleCloseUserMenu();
+    navigate("/login", { replace: true });
+  };
+
+  // Заглушка для перехода в профиль текущего пользователя
+  const handleGoToProfile = () => {
+    handleCloseUserMenu();
+    // здесь можно заменить на реальный путь, например /me или /patients/:id
+    navigate("/patients");
+  };
+
+  // Здесь можно позже подставлять реальные данные пользователя/роли из хранения
+  const currentUserName = "Admin";
+  const currentUserRole = "Reception desk";
 
   const drawerContent = (
     <Box
@@ -144,7 +175,8 @@ function Layout() {
                 color: "inherit",
               },
               "&.active": {
-                background: "linear-gradient(135deg, rgba(15,118,110,0.12), rgba(37,99,235,0.10))",
+                background:
+                  "linear-gradient(135deg, rgba(15,118,110,0.12), rgba(37,99,235,0.10))",
                 color: "#0f172a",
                 border: "1px solid rgba(255,255,255,0.55)",
                 boxShadow: "0 8px 18px rgba(15, 23, 42, 0.05)",
@@ -260,7 +292,10 @@ function Layout() {
               }}
             >
               <SearchIcon sx={{ color: "#64748b", mr: 1 }} />
-              <InputBase fullWidth placeholder="Search patients, doctors, appointments..." />
+              <InputBase
+                fullWidth
+                placeholder="Search patients, doctors, appointments..."
+              />
             </Paper>
 
             <IconButton
@@ -274,7 +309,9 @@ function Layout() {
               <NotificationsNoneOutlinedIcon />
             </IconButton>
 
+            {/* User menu trigger */}
             <Paper
+              onClick={handleOpenUserMenu}
               sx={{
                 px: 1.2,
                 py: 0.8,
@@ -285,6 +322,7 @@ function Layout() {
                 background: "rgba(255,255,255,0.55)",
                 border: "1px solid rgba(255,255,255,0.55)",
                 boxShadow: "none",
+                cursor: "pointer",
               }}
             >
               <Avatar
@@ -296,17 +334,29 @@ function Layout() {
                   background: "linear-gradient(135deg, #0f766e 0%, #2563eb 100%)",
                 }}
               >
-                A
+                {currentUserName.charAt(0).toUpperCase()}
               </Avatar>
               <Box sx={{ display: { xs: "none", md: "block" } }}>
                 <Typography sx={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>
-                  Admin
+                  {currentUserName}
                 </Typography>
                 <Typography sx={{ fontSize: 12, color: "#64748b" }}>
-                  Reception desk
+                  {currentUserRole}
                 </Typography>
               </Box>
             </Paper>
+
+            <Menu
+              anchorEl={userMenuAnchor}
+              open={Boolean(userMenuAnchor)}
+              onClose={handleCloseUserMenu}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
+            >
+              <MenuItem onClick={handleGoToProfile}>My profile</MenuItem>
+              {/* Для демо можно позже добавить пункт "Switch role" */}
+              <MenuItem onClick={handleLogout}>Logout</MenuItem>
+            </Menu>
           </Box>
         </Toolbar>
       </AppBar>

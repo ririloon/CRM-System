@@ -1,142 +1,220 @@
-from django.db.models import Count
-from django.utils import timezone
-from rest_framework import viewsets
-from rest_framework.decorators import action, api_view
+from rest_framework import viewsets, permissions
+from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Patient, Doctor, Appointment
+from .models import (
+    Patient,
+    Doctor,
+    Appointment,
+    DoctorSchedule,
+    VisitRecord,
+    Prescription,
+    MedicalDocument,
+    NotificationLog,
+)
 from .serializers import (
     PatientSerializer,
     DoctorSerializer,
-    AppointmentSerializer,
-    PatientDetailSerializer,
+    AppointmentListSerializer,
+    AppointmentDetailSerializer,
+    DoctorScheduleSerializer,
+    VisitRecordSerializer,
+    PrescriptionSerializer,
+    MedicalDocumentSerializer,
+    NotificationLogSerializer,
 )
+from accounts.models import UserProfile
 
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import IsAuthenticated
+class IsAdmin(permissions.BasePermission):
+    def has_permission(self, request, view):
+        profile = getattr(request.user, "profile", None)
+        return bool(
+            request.user.is_authenticated and profile and profile.role == "admin"
+        )
 
-from .models import Appointment
-from .serializers import AppointmentSerializer
+
+class IsDoctor(permissions.BasePermission):
+    def has_permission(self, request, view):
+        profile = getattr(request.user, "profile", None)
+        return bool(
+            request.user.is_authenticated and profile and profile.role == "doctor"
+        )
 
 
-
-from .models import Patient, Doctor, Appointment
-from .serializers import (
-    PatientSerializer,
-    DoctorSerializer,
-    AppointmentSerializer,
-)
-
-from .serializers import PatientDetailSerializer
-
-class PatientViewSet(ModelViewSet):
-    queryset = Patient.objects.all()
+class IsPatient(permissions.BasePermission):
+    def has_permission(self, request, view):
+        profile = getattr(request.user, "profile", None)
+        return bool(
+            request.user.is_authenticated and profile and profile.role == "patient"
+        )
+        
+        
+class PatientViewSet(viewsets.ModelViewSet):
+    queryset = Patient.objects.all().order_by("name")
     serializer_class = PatientSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        qs = super().get_queryset()
+        profile = getattr(user, "profile", None)
 
-        if not hasattr(user, "userprofile"):
-            return qs.none()
+        # Пациент видит только себя
+        if profile and profile.role == "patient":
+            return Patient.objects.filter(user=user)
 
-        role = user.userprofile.role
-
-        if role == "admin":
-            return qs.order_by("id")
-
-        # patient пока видит всех пациентов (потом можно сузить)
-        if role == "patient":
-            return qs.order_by("id")
-
-        return qs.none()
+        # Врач/админ видят всех (пока так, потом можно ужесточить)
+        return super().get_queryset()
     
-    @action(detail=True, methods=["get"])
-    def details(self, request, pk=None):
-        patient = self.get_object()
-        serializer = PatientDetailSerializer(patient)
-        return Response(serializer.data)
+    
 
-
-class DoctorViewSet(ModelViewSet):
-    queryset = Doctor.objects.all()
+class DoctorViewSet(viewsets.ModelViewSet):
+    queryset = Doctor.objects.all().order_by("name")
     serializer_class = DoctorSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        qs = super().get_queryset()
+        profile = getattr(user, "profile", None)
 
-        if not hasattr(user, "userprofile"):
-            return qs.none()
+        # Врач видит только себя
+        if profile and profile.role == "doctor":
+            return Doctor.objects.filter(user=user)
 
-        role = user.userprofile.role
+        return super().get_queryset()
+    
+    
+class AppointmentViewSet(viewsets.ModelViewSet):
+    queryset = Appointment.objects.select_related("patient", "doctor").order_by("date")
+    permission_classes = [permissions.IsAuthenticated]
 
-        if role == "admin":
-            return qs.order_by("id")
-
-        if role == "patient":
-            # пациентам можно показывать всех врачей
-            return qs.order_by("id")
-
-        return qs.none()
-
-
-class AppointmentViewSet(ModelViewSet):
-    queryset = Appointment.objects.all().select_related("patient", "doctor")
-    serializer_class = AppointmentSerializer
-    permission_classes = [IsAuthenticated]
+    def get_serializer_class(self):
+        if self.action in ["list"]:
+            return AppointmentListSerializer
+        return AppointmentDetailSerializer
 
     def get_queryset(self):
         user = self.request.user
+        profile = getattr(user, "profile", None)
+
         qs = super().get_queryset()
 
-        if not hasattr(user, "userprofile"):
+        if not profile:
             return qs.none()
 
-        role = user.userprofile.role
+        if profile.role == "patient":
+            # пациент видит только свои записи
+            return qs.filter(patient__user=user)
 
-        if role == "admin":
-            return qs.order_by("date")
+        if profile.role == "doctor":
+            # врач видит только свои записи
+            return qs.filter(doctor__user=user)
 
-        if role == "patient":
-            # позже можно будет сузить до своих приёмов
-            return qs.order_by("date")
+        # админ — всё
+        return qs
 
-        return qs.none()
+    def perform_create(self, serializer):
+        # если пациент создаёт запись, автоматически привязываем его Patient
+        user = self.request.user
+        profile = getattr(user, "profile", None)
+
+        if profile and profile.role == "patient":
+            patient = getattr(user, "patient_account", None)
+            serializer.save(patient=patient, booking_source="web")
+        else:
+            serializer.save()
+            
+            
+    @action(detail=True, methods=["post"])
+    def confirm(self, request, pk=None):
+        appointment = self.get_object()
+        appointment.status = "confirmed"
+        appointment.save()
+        return Response({"status": "confirmed"})
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        appointment = self.get_object()
+        appointment.status = "cancelled"
+        appointment.save()
+        return Response({"status": "cancelled"})
+
+    @action(detail=True, methods=["post"])
+    def mark_no_show(self, request, pk=None):
+        appointment = self.get_object()
+        appointment.status = "no_show"
+        appointment.save()
+        return Response({"status": "no_show"})
+    
+    
+class DoctorScheduleViewSet(viewsets.ModelViewSet):
+    queryset = DoctorSchedule.objects.select_related("doctor").all()
+    serializer_class = DoctorScheduleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        profile = getattr(user, "profile", None)
+
+        if profile and profile.role == "doctor":
+            return self.queryset.filter(doctor__user=user)
+
+        return self.queryset
+    
+    
+class VisitRecordViewSet(viewsets.ModelViewSet):
+    queryset = VisitRecord.objects.select_related(
+        "appointment", "patient", "doctor"
+    ).all()
+    serializer_class = VisitRecordSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        profile = getattr(user, "profile", None)
+        qs = super().get_queryset()
+
+        if not profile:
+            return qs.none()
+
+        if profile.role == "patient":
+            return qs.filter(patient__user=user)
+
+        if profile.role == "doctor":
+            return qs.filter(doctor__user=user)
+
+        return qs
+    
+    
+class PrescriptionViewSet(viewsets.ModelViewSet):
+    queryset = Prescription.objects.select_related("visit_record").all()
+    serializer_class = PrescriptionSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 
-@api_view(["GET"])
-def dashboard_stats(request):
-    today = timezone.localdate()
+class MedicalDocumentViewSet(viewsets.ModelViewSet):
+    queryset = MedicalDocument.objects.select_related("patient", "visit_record").all()
+    serializer_class = MedicalDocumentSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-    total_patients = Patient.objects.count()
-    total_doctors = Doctor.objects.count()
-    total_appointments = Appointment.objects.count()
-    today_appointments = Appointment.objects.filter(date__date=today).count()
-    completed_appointments = Appointment.objects.filter(status="completed").count()
-    cancelled_appointments = Appointment.objects.filter(status="cancelled").count()
+    def get_queryset(self):
+        user = self.request.user
+        profile = getattr(user, "profile", None)
+        qs = super().get_queryset()
 
-    recent_appointments = Appointment.objects.select_related("patient", "doctor").order_by("-date")[:5]
+        if not profile:
+            return qs.none()
 
-    recent_data = [
-        {
-            "id": item.id,
-            "patient_name": item.patient.name,
-            "doctor_name": item.doctor.name,
-            "date": item.date,
-            "status": item.status,
-        }
-        for item in recent_appointments
-    ]
+        if profile.role == "patient":
+            return qs.filter(patient__user=user)
 
-    return Response({
-        "total_patients": total_patients,
-        "total_doctors": total_doctors,
-        "total_appointments": total_appointments,
-        "today_appointments": today_appointments,
-        "completed_appointments": completed_appointments,
-        "cancelled_appointments": cancelled_appointments,
-        "recent_appointments": recent_data,
-    })
+        if profile.role == "doctor":
+            return qs  # можно позже ограничить по пациентам врача
+
+        return qs
+
+
+class NotificationLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = NotificationLog.objects.select_related("appointment").all()
+    serializer_class = NotificationLogSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
