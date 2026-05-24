@@ -7,7 +7,7 @@ from accounts.models import UserProfile
 
 class PatientRegisterSerializer(serializers.Serializer):
     username = serializers.CharField()
-    password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True)
 
     name = serializers.CharField()
@@ -23,6 +23,12 @@ class PatientRegisterSerializer(serializers.Serializer):
         if User.objects.filter(username=attrs["username"]).exists():
             raise serializers.ValidationError({
                 "username": "Username already exists."
+            })
+
+        email = attrs.get("email")
+        if email and User.objects.filter(email=email).exists():
+            raise serializers.ValidationError({
+                "email": "Email already exists."
             })
 
         return attrs

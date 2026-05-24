@@ -1,0 +1,11 @@
+{
+  "subtitle": "Sign in to continue using the clinic system",
+  "username": "Username",
+  "password": "Password",
+  "submit": "Sign in",
+  "noAccount": "Don't have an account?",
+  "goRegister": "Register",
+  "errors": {
+    "invalidCredentials": "Invalid username or password"
+  }
+}

@@ -1,6 +1,9 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.utils import timezone
+from datetime import timedelta
+from rest_framework.views import APIView
 
 from .models import (
     Patient,
@@ -113,12 +116,13 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        # если пациент создаёт запись, автоматически привязываем его Patient
         user = self.request.user
         profile = getattr(user, "profile", None)
 
         if profile and profile.role == "patient":
             patient = getattr(user, "patient_account", None)
+            if not patient:
+                raise permissions.PermissionDenied("Patient profile not found.")
             serializer.save(patient=patient, booking_source="web")
         else:
             serializer.save()
@@ -183,6 +187,32 @@ class VisitRecordViewSet(viewsets.ModelViewSet):
             return qs.filter(doctor__user=user)
 
         return qs
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        profile = getattr(user, "profile", None)
+        appointment = serializer.validated_data["appointment"]
+
+        if not profile or profile.role != "doctor":
+            raise permissions.PermissionDenied("Only doctors can create visit records.")
+
+        doctor = getattr(user, "doctor_account", None)
+        if not doctor:
+            raise permissions.PermissionDenied("Doctor profile not found.")
+
+        if appointment.doctor_id != doctor.id:
+            raise permissions.PermissionDenied("You can only create visit records for your own appointments.")
+
+        if hasattr(appointment, "visit_record"):
+            raise permissions.PermissionDenied("Visit record already exists for this appointment.")
+
+        serializer.save(
+            patient=appointment.patient,
+            doctor=appointment.doctor,
+        )
+
+        appointment.status = "completed"
+        appointment.save()
     
     
 class PrescriptionViewSet(viewsets.ModelViewSet):
@@ -218,3 +248,113 @@ class NotificationLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NotificationLogSerializer
     permission_classes = [permissions.IsAuthenticated]
     
+
+
+class DashboardSummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow = today_start + timedelta(days=1)
+        week_end = today_start + timedelta(days=7)
+
+        user = request.user
+        profile = getattr(user, "profile", None)
+
+        appointments = Appointment.objects.select_related("patient", "doctor").all()
+
+        if profile and profile.role == "doctor":
+            appointments = appointments.filter(doctor__user=user)
+        elif profile and profile.role == "patient":
+            appointments = appointments.filter(patient__user=user)
+
+        patients_qs = Patient.objects.all()
+        doctors_qs = Doctor.objects.all()
+
+        if profile and profile.role == "patient":
+            patients_count = 1
+        else:
+            patients_count = patients_qs.count()
+
+        doctors_count = doctors_qs.count()
+
+        future_appointments_count = appointments.filter(date__gte=now).count()
+        today_appointments_count = appointments.filter(
+            date__gte=today_start,
+            date__lt=tomorrow
+        ).count()
+        week_appointments_count = appointments.filter(
+            date__gte=today_start,
+            date__lt=week_end
+        ).count()
+        completed_appointments_count = appointments.filter(status="completed").count()
+        cancelled_appointments_count = appointments.filter(status="cancelled").count()
+        no_show_appointments_count = appointments.filter(status="no_show").count()
+        confirmed_appointments_count = appointments.filter(status="confirmed").count()
+        total_appointments_count = appointments.count()
+
+        recent_appointments_qs = appointments.order_by("-date")[:6]
+        today_schedule_qs = appointments.filter(
+            date__gte=today_start,
+            date__lt=tomorrow
+        ).order_by("date")[:6]
+
+        recent_appointments = [
+            {
+                "id": item.id,
+                "patient_name": item.patient.name if item.patient else "-",
+                "doctor_name": item.doctor.name if item.doctor else "-",
+                "date": item.date,
+                "status": item.status,
+            }
+            for item in recent_appointments_qs
+        ]
+
+        today_schedule_preview = [
+            {
+                "id": item.id,
+                "patient_name": item.patient.name if item.patient else "-",
+                "doctor_name": item.doctor.name if item.doctor else "-",
+                "date": item.date,
+                "status": item.status,
+            }
+            for item in today_schedule_qs
+        ]
+
+        weekly_trend = []
+        for i in range(7):
+            day_start = today_start + timedelta(days=i)
+            day_end = day_start + timedelta(days=1)
+            daily_count = appointments.filter(date__gte=day_start, date__lt=day_end).count()
+
+            weekly_trend.append({
+                "date": day_start.date().isoformat(),
+                "count": daily_count,
+            })
+
+        appointments_by_status = {
+            "confirmed": confirmed_appointments_count,
+            "completed": completed_appointments_count,
+            "cancelled": cancelled_appointments_count,
+            "no_show": no_show_appointments_count,
+        }
+
+        data = {
+            "patients_count": patients_count,
+            "doctors_count": doctors_count,
+            "total_appointments_count": total_appointments_count,
+            "future_appointments_count": future_appointments_count,
+            "today_appointments_count": today_appointments_count,
+            "week_appointments_count": week_appointments_count,
+            "completed_appointments_count": completed_appointments_count,
+            "cancelled_appointments_count": cancelled_appointments_count,
+            "no_show_appointments_count": no_show_appointments_count,
+            "confirmed_appointments_count": confirmed_appointments_count,
+            "appointments_by_status": appointments_by_status,
+            "weekly_trend": weekly_trend,
+            "recent_appointments": recent_appointments,
+            "today_schedule_preview": today_schedule_preview,
+        }
+
+        return Response(data)

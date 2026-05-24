@@ -1,69 +1,78 @@
-import { Box, Button, Paper, TextField, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Paper,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 import api from "../services/api";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-function Login() {
+function Register() {
   const [form, setForm] = useState({
     username: "",
     password: "",
+    confirm_password: "",
+    name: "",
+    phone: "",
+    email: "",
   });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation(["login", "common"]);
+  const { t, i18n } = useTranslation(["register", "common"]);
 
   const handleChange = (field) => (event) => {
-    setForm({ ...form, [field]: event.target.value });
+    setForm((prev) => ({
+      ...prev,
+      [field]: event.target.value,
+    }));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    setSuccess("");
 
     try {
-      const tokenRes = await api.post("auth/token/", {
-        username: form.username,
-        password: form.password,
-      });
+      await api.post("auth/register/patient/", form);
 
-      localStorage.setItem("accessToken", tokenRes.data.access);
-      localStorage.setItem("refreshToken", tokenRes.data.refresh);
+      setSuccess(
+        t("success", {
+          ns: "register",
+          defaultValue: "Registration completed successfully.",
+        })
+      );
 
-      const meRes = await api.get("auth/me/");
-      localStorage.setItem("authRole", meRes.data.role || "patient");
-      localStorage.setItem("authUsername", meRes.data.username || "");
-
-      const role = meRes.data.role || "patient";
-
-      if (role === "patient") {
-        const patientRes = await api.get("patients/");
-        const patient = Array.isArray(patientRes.data)
-          ? patientRes.data[0]
-          : patientRes.data;
-
-        const isProfileComplete =
-          patient?.full_name &&
-          patient?.phone &&
-          patient?.date_of_birth &&
-          patient?.gender;
-
-        if (isProfileComplete) {
-          navigate("/patient", { replace: true });
-        } else {
-          navigate("/patient/profile?mode=setup", { replace: true });
-        }
-      } else {
-        navigate("/", { replace: true });
-      }
+      setTimeout(() => {
+        navigate("/login");
+      }, 1200);
     } catch (err) {
       console.error(err);
+
+      const apiErrors = err?.response?.data;
+
+      if (typeof apiErrors === "string") {
+        setError(apiErrors);
+        return;
+      }
+
+      if (apiErrors && typeof apiErrors === "object") {
+        const firstError = Object.values(apiErrors)[0];
+        if (Array.isArray(firstError)) {
+          setError(firstError[0]);
+          return;
+        }
+      }
+
       setError(
-        t("errors.invalidCredentials", {
-          ns: "login",
-          defaultValue: "Invalid username or password",
-        }),
+        t("errors.default", {
+          ns: "register",
+          defaultValue: "Registration failed. Please try again.",
+        })
       );
     }
   };
@@ -92,7 +101,7 @@ function Login() {
       <Paper
         sx={{
           width: "100%",
-          maxWidth: 420,
+          maxWidth: 460,
           p: 4,
           borderRadius: 4,
           background: "rgba(255,255,255,0.85)",
@@ -146,23 +155,34 @@ function Login() {
           variant="h4"
           sx={{ fontWeight: 800, color: "#0f172a", mb: 1 }}
         >
-          {t("brand.name", {
-            ns: "common",
-            defaultValue: "Clinic CRM",
+          {t("title", {
+            ns: "register",
+            defaultValue: "Create account",
           })}
         </Typography>
 
         <Typography sx={{ color: "#64748b", mb: 3 }}>
           {t("subtitle", {
-            ns: "login",
-            defaultValue: "Sign in to continue using the clinic system",
+            ns: "register",
+            defaultValue: "Register as a patient to book appointments and manage your profile.",
           })}
         </Typography>
 
         <Box component="form" onSubmit={handleSubmit}>
           <TextField
+            label={t("name", {
+              ns: "register",
+              defaultValue: "Full name",
+            })}
+            fullWidth
+            margin="normal"
+            value={form.name}
+            onChange={handleChange("name")}
+          />
+
+          <TextField
             label={t("username", {
-              ns: "login",
+              ns: "register",
               defaultValue: "Username",
             })}
             fullWidth
@@ -172,8 +192,30 @@ function Login() {
           />
 
           <TextField
+            label={t("phone", {
+              ns: "register",
+              defaultValue: "Phone",
+            })}
+            fullWidth
+            margin="normal"
+            value={form.phone}
+            onChange={handleChange("phone")}
+          />
+
+          <TextField
+            label={t("email", {
+              ns: "register",
+              defaultValue: "Email",
+            })}
+            fullWidth
+            margin="normal"
+            value={form.email}
+            onChange={handleChange("email")}
+          />
+
+          <TextField
             label={t("password", {
-              ns: "login",
+              ns: "register",
               defaultValue: "Password",
             })}
             type="password"
@@ -183,9 +225,27 @@ function Login() {
             onChange={handleChange("password")}
           />
 
+          <TextField
+            label={t("confirmPassword", {
+              ns: "register",
+              defaultValue: "Confirm password",
+            })}
+            type="password"
+            fullWidth
+            margin="normal"
+            value={form.confirm_password}
+            onChange={handleChange("confirm_password")}
+          />
+
           {error && (
             <Typography sx={{ color: "#dc2626", mt: 1, fontSize: 14 }}>
               {error}
+            </Typography>
+          )}
+
+          {success && (
+            <Typography sx={{ color: "#16a34a", mt: 1, fontSize: 14 }}>
+              {success}
             </Typography>
           )}
 
@@ -201,28 +261,28 @@ function Login() {
             }}
           >
             {t("submit", {
-              ns: "login",
-              defaultValue: "Sign in",
+              ns: "register",
+              defaultValue: "Register",
             })}
           </Button>
 
           <Typography sx={{ mt: 2.5, color: "#64748b", textAlign: "center" }}>
-            {t("noAccount", {
-              ns: "login",
-              defaultValue: "Don't have an account?",
+            {t("haveAccount", {
+              ns: "register",
+              defaultValue: "Already have an account?",
             })}{" "}
             <Box
               component={RouterLink}
-              to="/register"
+              to="/login"
               sx={{
                 color: "#2563eb",
                 textDecoration: "none",
                 fontWeight: 700,
               }}
             >
-              {t("goRegister", {
-                ns: "login",
-                defaultValue: "Register",
+              {t("goLogin", {
+                ns: "register",
+                defaultValue: "Sign in",
               })}
             </Box>
           </Typography>
@@ -232,4 +292,4 @@ function Login() {
   );
 }
 
-export default Login;
+export default Register;

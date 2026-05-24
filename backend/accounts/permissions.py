@@ -3,8 +3,9 @@ from rest_framework.permissions import BasePermission
 class IsAdmin(BasePermission):
     def has_permission(self, request, view):
         user = request.user
-        return (
+        profile = getattr(user, "profile", None)
+        return bool(
             user.is_authenticated
-            and hasattr(user, "userprofile")
-            and user.userprofile.role == "admin"
+            and profile
+            and profile.role == "admin"
         )

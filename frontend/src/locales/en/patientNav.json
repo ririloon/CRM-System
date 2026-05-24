@@ -1,0 +1,20 @@
+{
+  "portal": "Patient portal",
+  "section": "Navigation",
+  "dashboard": "Dashboard",
+  "appointments": "My appointments",
+  "book": "Book appointment",
+  "documents": "My documents",
+  "profile": "My profile",
+  "logout": "Log out",
+  "patient": "Patient",
+  "personalWorkspace": "Personal workspace",
+  "topbar": {
+    "title": "Patient workspace",
+    "subtitle": "Manage appointments, documents, and profile details"
+  },
+  "promo": {
+    "title": "Manage your care",
+    "text": "Book visits, track appointments, and keep your medical information in one place."
+  }
+}

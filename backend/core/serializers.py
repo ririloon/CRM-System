@@ -86,6 +86,7 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         queryset=Patient.objects.all(),
         source="patient",
         write_only=True,
+        required=False,
     )
     doctor = DoctorSerializer(read_only=True)
     doctor_id = serializers.PrimaryKeyRelatedField(
@@ -111,7 +112,13 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
             "reminder_sent",
             "created_at",
         ]
-
+        read_only_fields = [
+            "status",
+            "booking_source",
+            "confirmation_sent",
+            "reminder_sent",
+            "created_at",
+        ]
 
 class PrescriptionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -129,6 +136,11 @@ class PrescriptionSerializer(serializers.ModelSerializer):
 class VisitRecordSerializer(serializers.ModelSerializer):
     patient = serializers.StringRelatedField(read_only=True)
     doctor = serializers.StringRelatedField(read_only=True)
+    appointment_id = serializers.PrimaryKeyRelatedField(
+        queryset=Appointment.objects.all(),
+        source="appointment",
+        write_only=True,
+    )
     prescriptions = PrescriptionSerializer(many=True, read_only=True)
 
     class Meta:
@@ -136,6 +148,7 @@ class VisitRecordSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "appointment",
+            "appointment_id",
             "patient",
             "doctor",
             "diagnosis",
@@ -145,6 +158,7 @@ class VisitRecordSerializer(serializers.ModelSerializer):
             "created_at",
             "prescriptions",
         ]
+        read_only_fields = ["appointment", "patient", "doctor", "created_at"]
 
 
 class MedicalDocumentSerializer(serializers.ModelSerializer):

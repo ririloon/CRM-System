@@ -1,0 +1,22 @@
+{
+  "brand": {
+    "name": "Clinic CRM",
+    "subtitle": "Медициналык иш мейкиндиги"
+  },
+  "language": "Тил",
+  "languages": {
+    "ru": "Рус",
+    "ky": "Кыр",
+    "en": "Eng"
+  },
+  "actions": {
+    "save": "Сактоо",
+    "saving": "Сакталып жатат...",
+    "cancel": "Жокко чыгаруу",
+    "edit": "Түзөтүү",
+    "logout": "Чыгуу"
+  },
+  "placeholders": {
+    "notSpecified": "Көрсөтүлгөн эмес"
+  }
+}

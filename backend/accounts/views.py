@@ -39,5 +39,5 @@ class MeView(APIView):
             "patient_id": patient.id if patient else None,
         }
 
-        serializer = MeSerializer(data)
+        serializer = MeSerializer(instance=data)
         return Response(serializer.data)

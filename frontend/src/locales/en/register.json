@@ -1,0 +1,17 @@
+{
+  "title": "Create account",
+  "subtitle": "Register as a patient to book appointments and manage your profile.",
+  "name": "Full name",
+  "username": "Username",
+  "phone": "Phone",
+  "email": "Email",
+  "password": "Password",
+  "confirmPassword": "Confirm password",
+  "submit": "Register",
+  "haveAccount": "Already have an account?",
+  "goLogin": "Sign in",
+  "success": "Registration completed successfully.",
+  "errors": {
+    "default": "Registration failed. Please try again."
+  }
+}

@@ -1,4 +1,5 @@
 import "./index.css";
+import "./i18n";
 
 import { CssBaseline, ThemeProvider } from "@mui/material";
 

@@ -1,0 +1,22 @@
+{
+  "brand": {
+    "name": "Clinic CRM",
+    "subtitle": "Medical workspace"
+  },
+  "language": "Language",
+  "languages": {
+    "ru": "Рус",
+    "ky": "Кыр",
+    "en": "Eng"
+  },
+  "actions": {
+    "save": "Save",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "logout": "Log out"
+  },
+  "placeholders": {
+    "notSpecified": "Not specified"
+  }
+}

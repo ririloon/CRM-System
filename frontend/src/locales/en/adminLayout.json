@@ -1,0 +1,29 @@
+{
+  "nav": {
+    "section": "Navigation",
+    "dashboard": "Dashboard",
+    "patients": "Patients",
+    "appointments": "Appointments",
+    "doctors": "Doctors",
+    "schedule": "Schedule"
+  },
+  "topbar": {
+    "title": "Admin workspace",
+    "subtitle": "Manage clinic operations, staff, and appointments"
+  },
+  "promo": {
+    "title": "Monitor clinic activity",
+    "text": "Track patients, appointments, doctors, and schedules from one workspace."
+  },
+  "user": {
+    "profile": "Profile",
+    "logout": "Log out"
+  },
+  "roles": {
+    "admin": "Administrator",
+    "doctor": "Doctor",
+    "patient": "Patient",
+    "reception": "Reception",
+    "reception desk": "Reception desk"
+  }
+}

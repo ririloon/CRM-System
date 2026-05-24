@@ -1,0 +1,81 @@
+{
+  "eyebrow": "Patient profile",
+  "title": "My profile",
+  "subtitle": "Complete and update your personal and medical information for smoother clinic service.",
+  "sections": {
+    "personal": "Personal information",
+    "contact": "Contact information",
+    "medical": "Medical information",
+    "emergency": "Emergency contact"
+  },
+  "fields": {
+    "fullName": "Full name",
+    "dateOfBirth": "Date of birth",
+    "gender": "Gender",
+    "phone": "Phone",
+    "email": "Email",
+    "address": "Address",
+    "bloodGroup": "Blood group",
+    "allergies": "Allergies",
+    "chronicConditions": "Chronic conditions",
+    "emergencyContactName": "Emergency contact name",
+    "emergencyContactPhone": "Emergency contact phone",
+    "notes": "Additional notes"
+  },
+  "genderOptions": {
+    "male": "Male",
+    "female": "Female",
+    "other": "Other"
+  },
+  "actions": {
+    "edit": "Edit profile",
+    "save": "Save profile",
+    "saving": "Saving...",
+    "cancel": "Cancel"
+  },
+  "validation": {
+    "fullName": "Enter full name.",
+    "phone": "Enter phone number.",
+    "dateOfBirth": "Select date of birth.",
+    "gender": "Select gender."
+  },
+  "errors": {
+    "load": "Failed to load patient profile.",
+    "save": "Failed to save patient profile."
+  },
+  "success": {
+    "save": "Profile information saved successfully."
+  },
+  "summary": {
+    "title": "Profile completion",
+    "subtitle": "Complete the key patient details.",
+    "progress": "Completion progress",
+    "incomplete": "Fill in the required profile fields to complete your account.",
+    "complete": "Your main patient profile details are completed."
+  },
+  "tips": {
+    "title": "Why this matters",
+    "subtitle": "Helpful reasons to keep your data updated.",
+    "identity": "Accurate personal details help the clinic identify your account correctly.",
+    "contacts": "Current phone and emergency contact information improves communication.",
+    "medical": "Medical notes like allergies and chronic conditions support safer care."
+  },
+  "required": {
+    "title": "Required fields",
+    "subtitle": "Fill these first after registration."
+  },
+  "placeholders": {
+    "fullName": "Not specified",
+    "dateOfBirth": "Not specified",
+    "gender": "Not specified",
+    "phone": "Not specified",
+    "email": "Not specified",
+    "address": "Not specified",
+    "bloodGroup": "Not specified",
+    "allergies": "Not specified",
+    "chronicConditions": "Not specified",
+    "emergencyContactName": "Not specified",
+    "emergencyContactPhone": "Not specified",
+    "notes": "Not specified"
+  }
+}

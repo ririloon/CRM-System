@@ -17,27 +17,44 @@ import {
 } from "@mui/material";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
+import AddCircleOutlineOutlinedIcon from "@mui/icons-material/AddCircleOutlineOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
-import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
-import LocalHospitalOutlinedIcon from "@mui/icons-material/LocalHospitalOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
-import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
-import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 const drawerWidth = 272;
 
 const menuItems = [
-  { key: "dashboard", icon: <DashboardOutlinedIcon />, path: "/" },
-  { key: "patients", icon: <PeopleAltOutlinedIcon />, path: "/patients" },
+  {
+    key: "dashboard",
+    icon: <DashboardOutlinedIcon />,
+    path: "/patient",
+    end: true,
+  },
   {
     key: "appointments",
-    icon: <EventAvailableOutlinedIcon />,
-    path: "/appointments",
+    icon: <EventNoteOutlinedIcon />,
+    path: "/patient/appointments",
   },
-  { key: "doctors", icon: <LocalHospitalOutlinedIcon />, path: "/doctors" },
-  { key: "schedule", icon: <EventAvailableOutlinedIcon />, path: "/schedule" },
+  {
+    key: "book",
+    icon: <AddCircleOutlineOutlinedIcon />,
+    path: "/patient/book",
+  },
+  {
+    key: "documents",
+    icon: <DescriptionOutlinedIcon />,
+    path: "/patient/documents",
+  },
+  {
+    key: "profile",
+    icon: <PersonOutlineOutlinedIcon />,
+    path: "/patient/profile",
+  },
 ];
 
 const glassSidebarSx = {
@@ -56,12 +73,25 @@ const glassTopbarSx = {
   boxShadow: "0 8px 24px rgba(15, 23, 42, 0.04)",
 };
 
-function Layout() {
+function PatientLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
 
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation(["common", "adminLayout"]);
+  const { t, i18n } = useTranslation(["common", "patientNav"]);
+
+  const currentUserName =
+    localStorage.getItem("patientDisplayName") ||
+    localStorage.getItem("authUsername") ||
+    "";
+
+  const currentUserRole = localStorage.getItem("authRole") || "patient";
+
+  const currentLang = i18n.language?.startsWith("ky")
+    ? "ky"
+    : i18n.language?.startsWith("en")
+      ? "en"
+      : "ru";
 
   const handleDrawerToggle = () => {
     setMobileOpen((prev) => !prev);
@@ -78,25 +108,17 @@ function Layout() {
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
-    localStorage.removeItem("authUsername");
     localStorage.removeItem("authRole");
+    localStorage.removeItem("authUsername");
+    localStorage.removeItem("patientDisplayName");
     handleCloseUserMenu();
     navigate("/login", { replace: true });
   };
 
   const handleGoToProfile = () => {
     handleCloseUserMenu();
-    navigate("/patients");
+    navigate("/patient/profile");
   };
-
-  const currentUserName = localStorage.getItem("authUsername") || "Admin";
-  const currentUserRole = localStorage.getItem("authRole") || "admin";
-
-  const currentLang = i18n.language?.startsWith("ky")
-    ? "ky"
-    : i18n.language?.startsWith("en")
-      ? "en"
-      : "ru";
 
   const drawerContent = (
     <Box
@@ -151,9 +173,9 @@ function Layout() {
             })}
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b" }}>
-            {t("brand.subtitle", {
-              ns: "common",
-              defaultValue: "Clinic management system",
+            {t("portal", {
+              ns: "patientNav",
+              defaultValue: "Patient portal",
             })}
           </Typography>
         </Box>
@@ -171,8 +193,8 @@ function Layout() {
           fontWeight: 700,
         }}
       >
-        {t("nav.section", {
-          ns: "adminLayout",
+        {t("section", {
+          ns: "patientNav",
           defaultValue: "Navigation",
         })}
       </Typography>
@@ -183,6 +205,7 @@ function Layout() {
             key={item.key}
             component={NavLink}
             to={item.path}
+            end={item.end}
             onClick={() => setMobileOpen(false)}
             sx={{
               borderRadius: 3,
@@ -205,8 +228,8 @@ function Layout() {
           >
             <ListItemIcon>{item.icon}</ListItemIcon>
             <ListItemText
-              primary={t(`nav.${item.key}`, {
-                ns: "adminLayout",
+              primary={t(item.key, {
+                ns: "patientNav",
                 defaultValue: item.key,
               })}
               primaryTypographyProps={{
@@ -234,15 +257,15 @@ function Layout() {
       >
         <Typography sx={{ fontWeight: 700, color: "#0f172a", mb: 0.5 }}>
           {t("promo.title", {
-            ns: "adminLayout",
-            defaultValue: "Monitor clinic activity",
+            ns: "patientNav",
+            defaultValue: "Manage your care",
           })}
         </Typography>
         <Typography variant="body2" sx={{ color: "#64748b", lineHeight: 1.6 }}>
           {t("promo.text", {
-            ns: "adminLayout",
+            ns: "patientNav",
             defaultValue:
-              "Track patients, appointments, doctors, and schedules from one workspace.",
+              "Book visits, track appointments, and keep your medical information in one place.",
           })}
         </Typography>
       </Paper>
@@ -294,15 +317,15 @@ function Layout() {
                 sx={{ fontWeight: 700, color: "#0f172a", lineHeight: 1.1 }}
               >
                 {t("topbar.title", {
-                  ns: "adminLayout",
-                  defaultValue: "Admin workspace",
+                  ns: "patientNav",
+                  defaultValue: "Patient workspace",
                 })}
               </Typography>
               <Typography variant="body2" sx={{ color: "#64748b" }}>
                 {t("topbar.subtitle", {
-                  ns: "adminLayout",
+                  ns: "patientNav",
                   defaultValue:
-                    "Manage clinic operations, staff, and appointments",
+                    "Manage appointments, documents, and profile details",
                 })}
               </Typography>
             </Box>
@@ -350,17 +373,6 @@ function Layout() {
               ))}
             </Paper>
 
-            <IconButton
-              sx={{
-                width: 42,
-                height: 42,
-                background: "rgba(255,255,255,0.55)",
-                border: "1px solid rgba(255,255,255,0.55)",
-              }}
-            >
-              <NotificationsNoneOutlinedIcon />
-            </IconButton>
-
             <Paper
               onClick={handleOpenUserMenu}
               sx={{
@@ -386,20 +398,26 @@ function Layout() {
                     "linear-gradient(135deg, #0f766e 0%, #2563eb 100%)",
                 }}
               >
-                {currentUserName.charAt(0).toUpperCase()}
+                {(currentUserName || "P").charAt(0).toUpperCase()}
               </Avatar>
 
               <Box sx={{ display: { xs: "none", md: "block" } }}>
                 <Typography
                   sx={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}
                 >
-                  {currentUserName}
+                  {currentUserName ||
+                    t("patient", {
+                      ns: "patientNav",
+                      defaultValue: "Patient",
+                    })}
                 </Typography>
                 <Typography sx={{ fontSize: 12, color: "#64748b" }}>
-                  {t(`roles.${currentUserRole}`, {
-                    ns: "adminLayout",
-                    defaultValue: currentUserRole,
-                  })}
+                  {currentUserRole === "patient"
+                    ? t("personalWorkspace", {
+                        ns: "patientNav",
+                        defaultValue: "Personal workspace",
+                      })
+                    : currentUserRole}
                 </Typography>
               </Box>
             </Paper>
@@ -412,14 +430,14 @@ function Layout() {
               transformOrigin={{ vertical: "top", horizontal: "right" }}
             >
               <MenuItem onClick={handleGoToProfile}>
-                {t("user.profile", {
-                  ns: "adminLayout",
-                  defaultValue: "Profile",
+                {t("profile", {
+                  ns: "patientNav",
+                  defaultValue: "My profile",
                 })}
               </MenuItem>
               <MenuItem onClick={handleLogout}>
-                {t("user.logout", {
-                  ns: "adminLayout",
+                {t("logout", {
+                  ns: "patientNav",
                   defaultValue: "Log out",
                 })}
               </MenuItem>
@@ -480,4 +498,4 @@ function Layout() {
   );
 }
 
-export default Layout;
+export default PatientLayout;

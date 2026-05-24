@@ -227,8 +227,8 @@ class NotificationLog(models.Model):
     message_type = models.CharField(max_length=20, choices=MESSAGE_TYPE_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     sent_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    error_message = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.channel} - {self.message_type} - {self.status}"
-
-
+        return f"{self.appointment} - {self.channel} - {self.message_type}"
