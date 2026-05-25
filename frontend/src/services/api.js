@@ -83,3 +83,20 @@ export const markNoShow = (id) => api.post(`appointments/${id}/mark_no_show/`);
 export const getVisitRecords = () => api.get("visit-records/");
 export const getDocuments = () => api.get("documents/");
 export const getDoctorSchedules = () => api.get("doctor-schedules/");
+
+
+export const getPatientMe = () => api.get("patients/me/");
+export const updatePatientMe = (data) => api.patch("patients/me/", data);
+
+export const getDoctorAvailableSlots = (doctorId, date) =>
+  api.get(`doctors/${doctorId}/available-slots/`, {
+    params: { date },
+  });
+
+export const getMyAppointments = () => api.get("appointments/my/");
+export const getMyVisitRecords = () => api.get("visit-records/my/");
+export const getMyDocuments = () => api.get("documents/my/");
+
+export const getDashboardSummary = () => api.get("dashboard/");
+
+export const createPrescription = (data) => api.post("prescriptions/", data);

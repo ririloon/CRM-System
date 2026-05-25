@@ -104,6 +104,12 @@ const emptyForm = {
   experience_years: "",
   bio: "",
   is_available_online: false,
+
+  // account access
+  login_email: "",
+  send_invite: true,
+  has_account: false,
+  last_invite_status: "",
 };
 
 function Doctors() {
@@ -122,7 +128,7 @@ function Doctors() {
   const loadDoctors = useCallback(() => {
     api
       .get("doctors/")
-      .then((res) => setDoctors(res.data))
+      .then((res) => setDoctors(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error(err));
   }, []);
 
@@ -132,7 +138,14 @@ function Doctors() {
 
   const handleOpenCreate = () => {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      // по умолчанию логин‑email = email профиля, можно изменить
+      login_email: "",
+      send_invite: true,
+      has_account: false,
+      last_invite_status: "",
+    });
     setOpen(true);
   };
 
@@ -153,6 +166,10 @@ function Doctors() {
         form.experience_years === "" ? 0 : Number(form.experience_years),
       bio: form.bio,
       is_available_online: form.is_available_online,
+
+      // account part — на бэке по этому создаём/обновляем user
+      login_email: form.login_email || form.email || "",
+      send_invite: !!form.send_invite,
     };
 
     const request = editingId
@@ -178,6 +195,12 @@ function Doctors() {
       experience_years: row.experience_years ?? "",
       bio: row.bio || "",
       is_available_online: !!row.is_available_online,
+
+      // account info из API
+      login_email: row.login_email || row.email || "",
+      send_invite: false,
+      has_account: !!row.has_account,
+      last_invite_status: row.last_invite_status || "",
     });
     setOpen(true);
   };
@@ -203,8 +226,9 @@ function Doctors() {
 
   const filteredRows = useMemo(() => {
     return doctors.filter((doctor) => {
-      const text =
-        `${doctor.name || ""} ${doctor.specialization || ""} ${doctor.phone || ""} ${doctor.email || ""} ${doctor.license_number || ""}`.toLowerCase();
+      const text = (
+        `${doctor.name || ""} ${doctor.specialization || ""} ${doctor.phone || ""} ${doctor.email || ""} ${doctor.license_number || ""}`
+      ).toLowerCase();
 
       const matchesSearch = text.includes(search.toLowerCase());
 
@@ -224,8 +248,10 @@ function Doctors() {
   const onlineDoctors = doctors.filter((d) => d.is_available_online).length;
   const avgExperience = doctors.length
     ? Math.round(
-        doctors.reduce((sum, doctor) => sum + (doctor.experience_years || 0), 0) /
-          doctors.length
+        doctors.reduce(
+          (sum, doctor) => sum + (doctor.experience_years || 0),
+          0
+        ) / doctors.length
       )
     : 0;
 
@@ -348,17 +374,17 @@ function Doctors() {
         ),
       },
       {
-        field: "phone",
-        headerName: "Phone",
-        flex: 1,
-        minWidth: 150,
-        renderCell: (params) => params.value || "—",
-      },
-      {
         field: "email",
         headerName: "Email",
         flex: 1.2,
         minWidth: 220,
+        renderCell: (params) => params.value || "—",
+      },
+      {
+        field: "phone",
+        headerName: "Phone",
+        flex: 1,
+        minWidth: 150,
         renderCell: (params) => params.value || "—",
       },
       {
@@ -368,7 +394,12 @@ function Doctors() {
         sortable: false,
         filterable: false,
         renderCell: (params) => (
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ height: "100%" }}>
+          <Stack
+            direction="row"
+            spacing={0.5}
+            alignItems="center"
+            sx={{ height: "100%" }}
+          >
             <IconButton
               size="small"
               onClick={() => handleEdit(params.row)}
@@ -729,121 +760,314 @@ function Doctors() {
         title={editingId ? "Edit Doctor" : "Add New Doctor"}
         subtitle={
           editingId
-            ? "Update provider profile details in the clinic directory"
-            : "Create a complete provider profile for scheduling and patient access"
+            ? "Update provider profile details and account access"
+            : "Create a provider profile and grant access to the system"
         }
         saveText={editingId ? "Update Doctor" : "Save Doctor"}
         onSave={handleSave}
         saveDisabled={!form.name || !form.specialization}
       >
-        <Box sx={{ display: "grid", gap: 2.2 }}>
-          <TextField
-            label="Doctor name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            fullWidth
-            sx={formFieldSx}
-          />
+        <Box sx={{ display: "grid", gap: 2.6 }}>
+          {/* Профессиональный профиль */}
+          <Box>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: 0.8,
+                color: "#64748b",
+                mb: 1.2,
+              }}
+            >
+              Professional profile
+            </Typography>
 
-          <TextField
-            label="Specialization"
-            value={form.specialization}
-            onChange={(e) =>
-              setForm({ ...form, specialization: e.target.value })
-            }
-            fullWidth
-            sx={formFieldSx}
-          />
+            <Box sx={{ display: "grid", gap: 2.2 }}>
+              <TextField
+                label="Doctor name"
+                value={form.name}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+                fullWidth
+                sx={formFieldSx}
+              />
 
-          <Box
-            sx={{
-              display: "grid",
-              gap: 2.2,
-              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-            }}
-          >
-            <TextField
-              label="Phone"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              fullWidth
-              sx={formFieldSx}
-            />
+              <TextField
+                label="Specialization"
+                value={form.specialization}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    specialization: e.target.value,
+                  }))
+                }
+                fullWidth
+                sx={formFieldSx}
+              />
 
-            <TextField
-              label="Email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              fullWidth
-              sx={formFieldSx}
-            />
-          </Box>
-
-          <Box
-            sx={{
-              display: "grid",
-              gap: 2.2,
-              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-            }}
-          >
-            <TextField
-              label="License number"
-              value={form.license_number}
-              onChange={(e) =>
-                setForm({ ...form, license_number: e.target.value })
-              }
-              fullWidth
-              sx={formFieldSx}
-            />
-
-            <TextField
-              label="Experience (years)"
-              type="number"
-              value={form.experience_years}
-              onChange={(e) =>
-                setForm({ ...form, experience_years: e.target.value })
-              }
-              fullWidth
-              sx={formFieldSx}
-            />
-          </Box>
-
-          <TextField
-            label="Bio"
-            value={form.bio}
-            onChange={(e) => setForm({ ...form, bio: e.target.value })}
-            fullWidth
-            multiline
-            minRows={3}
-            sx={formFieldSx}
-          />
-
-          <Box
-            sx={{
-              minHeight: 56,
-              px: 1.5,
-              borderRadius: 3,
-              backgroundColor: "#ffffff",
-              border: "1px solid rgba(148, 163, 184, 0.24)",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.is_available_online}
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 2.2,
+                  gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                }}
+              >
+                <TextField
+                  label="Phone"
+                  value={form.phone}
                   onChange={(e) =>
-                    setForm({
-                      ...form,
-                      is_available_online: e.target.checked,
-                    })
+                    setForm((prev) => ({ ...prev, phone: e.target.value }))
                   }
+                  fullWidth
+                  sx={formFieldSx}
                 />
-              }
-              label="Available for online consultations"
-              sx={{ m: 0 }}
-            />
+
+                <TextField
+                  label="Profile email"
+                  value={form.email}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, email: e.target.value }))
+                  }
+                  fullWidth
+                  sx={formFieldSx}
+                />
+              </Box>
+
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 2.2,
+                  gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                }}
+              >
+                <TextField
+                  label="License number"
+                  value={form.license_number}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      license_number: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                  sx={formFieldSx}
+                />
+
+                <TextField
+                  label="Experience (years)"
+                  type="number"
+                  value={form.experience_years}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      experience_years: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                  sx={formFieldSx}
+                />
+              </Box>
+
+              <TextField
+                label="Bio"
+                value={form.bio}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, bio: e.target.value }))
+                }
+                fullWidth
+                multiline
+                minRows={3}
+                sx={formFieldSx}
+              />
+
+              <Box
+                sx={{
+                  minHeight: 56,
+                  px: 1.5,
+                  borderRadius: 3,
+                  backgroundColor: "#ffffff",
+                  border: "1px solid rgba(148, 163, 184, 0.24)",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.is_available_online}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          is_available_online: e.target.checked,
+                        }))
+                      }
+                    />
+                  }
+                  label="Available for online consultations"
+                  sx={{ m: 0 }}
+                />
+              </Box>
+            </Box>
+          </Box>
+
+          <Divider sx={{ my: 0.5 }} />
+
+          {/* Account access */}
+          <Box>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: 0.8,
+                color: "#64748b",
+                mb: 1.2,
+              }}
+            >
+              Account access
+            </Typography>
+
+            <Typography
+              sx={{
+                fontSize: 13,
+                color: "#94a3b8",
+                mb: 1.6,
+              }}
+            >
+              Configure how this doctor signs in to the system. An invite email is used so
+              the doctor can set their own password securely.
+            </Typography>
+
+            <Box
+              sx={{
+                display: "grid",
+                gap: 2.2,
+                gridTemplateColumns: { xs: "1fr", md: "1.4fr 1fr" },
+              }}
+            >
+              <TextField
+                label="Login email"
+                placeholder="doctor.login@example.com"
+                value={form.login_email}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    login_email: e.target.value,
+                  }))
+                }
+                fullWidth
+                sx={formFieldSx}
+              />
+
+              <Box
+                sx={{
+                  minHeight: 56,
+                  px: 1.5,
+                  borderRadius: 3,
+                  backgroundColor: "#ffffff",
+                  border: "1px solid rgba(148, 163, 184, 0.24)",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.send_invite}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          send_invite: e.target.checked,
+                        }))
+                      }
+                    />
+                  }
+                  label={
+                    editingId
+                      ? "Send login invite email again"
+                      : "Send login invite email"
+                  }
+                  sx={{ m: 0 }}
+                />
+              </Box>
+            </Box>
+
+            {editingId && (
+              <Box
+                sx={{
+                  mt: 1.8,
+                  display: "grid",
+                  gap: 1.2,
+                  gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                }}
+              >
+                <Box
+                  sx={{
+                    px: 1.4,
+                    py: 1.1,
+                    borderRadius: 3,
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid rgba(148,163,184,0.25)",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      color: "#64748b",
+                      mb: 0.3,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.6,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Account linked
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: form.has_account ? "#16a34a" : "#64748b",
+                    }}
+                  >
+                    {form.has_account ? "Yes, doctor can sign in" : "Not yet created"}
+                  </Typography>
+                </Box>
+
+                <Box
+                  sx={{
+                    px: 1.4,
+                    py: 1.1,
+                    borderRadius: 3,
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid rgba(148,163,184,0.25)",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      color: "#64748b",
+                      mb: 0.3,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.6,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Last invite
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#0f172a",
+                    }}
+                  >
+                    {form.last_invite_status || "No invite information"}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
           </Box>
         </Box>
       </GlassFormDialog>

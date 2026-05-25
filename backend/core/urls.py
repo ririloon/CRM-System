@@ -8,6 +8,7 @@ from .views import (
     DoctorViewSet,
     MedicalDocumentViewSet,
     NotificationLogViewSet,
+    PatientMeView,
     PatientViewSet,
     PrescriptionViewSet,
     VisitRecordViewSet,
@@ -27,5 +28,6 @@ router.register(r"notifications", NotificationLogViewSet, basename="notification
 
 urlpatterns = [
     path("dashboard/", DashboardSummaryView.as_view(), name="dashboard-summary"),
+    path("patients/me/", PatientMeView.as_view(), name="patient-me"),
     path("", include(router.urls)),
 ]

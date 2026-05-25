@@ -5,6 +5,13 @@ import api from "../services/api";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+function clearAuthStorage() {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("authRole");
+  localStorage.removeItem("authUsername");
+}
+
 function Login() {
   const [form, setForm] = useState({
     username: "",
@@ -23,6 +30,8 @@ function Login() {
     setError("");
 
     try {
+      clearAuthStorage();
+
       const tokenRes = await api.post("auth/token/", {
         username: form.username,
         password: form.password,
@@ -32,10 +41,11 @@ function Login() {
       localStorage.setItem("refreshToken", tokenRes.data.refresh);
 
       const meRes = await api.get("auth/me/");
-      localStorage.setItem("authRole", meRes.data.role || "patient");
-      localStorage.setItem("authUsername", meRes.data.username || "");
-
       const role = meRes.data.role || "patient";
+      const username = meRes.data.username || form.username;
+
+      localStorage.setItem("authRole", role);
+      localStorage.setItem("authUsername", username);
 
       if (role === "patient") {
         const patientRes = await api.get("patients/");
@@ -54,10 +64,17 @@ function Login() {
         } else {
           navigate("/patient/profile?mode=setup", { replace: true });
         }
-      } else {
-        navigate("/", { replace: true });
+        return;
       }
+
+      if (role === "doctor") {
+        navigate("/doctor", { replace: true });
+        return;
+      }
+
+      navigate("/", { replace: true });
     } catch (err) {
+      clearAuthStorage();
       console.error(err);
       setError(
         t("errors.invalidCredentials", {

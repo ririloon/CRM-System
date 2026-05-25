@@ -17,12 +17,12 @@ import {
 } from "@mui/material";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
-import AddCircleOutlineOutlinedIcon from "@mui/icons-material/AddCircleOutlineOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
-import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
+import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
+import LocalHospitalOutlinedIcon from "@mui/icons-material/LocalHospitalOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
-import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
+import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -32,28 +32,23 @@ const menuItems = [
   {
     key: "dashboard",
     icon: <DashboardOutlinedIcon />,
-    path: "/patient",
+    path: "/doctor",
     end: true,
   },
   {
-    key: "appointments",
-    icon: <EventNoteOutlinedIcon />,
-    path: "/patient/appointments",
+    key: "schedule",
+    icon: <EventAvailableOutlinedIcon />,
+    path: "/doctor/schedule",
   },
   {
-    key: "book",
-    icon: <AddCircleOutlineOutlinedIcon />,
-    path: "/patient/book",
+    key: "patients",
+    icon: <PeopleAltOutlinedIcon />,
+    path: "/doctor/patients",
   },
   {
-    key: "documents",
-    icon: <DescriptionOutlinedIcon />,
-    path: "/patient/documents",
-  },
-  {
-    key: "profile",
-    icon: <PersonOutlineOutlinedIcon />,
-    path: "/patient/profile",
+    key: "records",
+    icon: <LocalHospitalOutlinedIcon />,
+    path: "/doctor/records",
   },
 ];
 
@@ -81,15 +76,15 @@ function clearSession() {
   localStorage.removeItem("patientDisplayName");
 }
 
-function PatientLayout() {
+function DoctorLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
 
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation(["common", "patientNav"]);
+  const { t, i18n } = useTranslation(["common", "doctorLayout"]);
 
-  const currentUserName = localStorage.getItem("authUsername") || "";
-  const currentUserRole = localStorage.getItem("authRole") || "patient";
+  const currentUserName = localStorage.getItem("authUsername") || "Doctor";
+  const currentUserRole = localStorage.getItem("authRole") || "doctor";
 
   const currentLang = i18n.language?.startsWith("ky")
     ? "ky"
@@ -118,7 +113,7 @@ function PatientLayout() {
 
   const handleGoToProfile = () => {
     handleCloseUserMenu();
-    navigate("/patient/profile");
+    navigate("/doctor/patients");
   };
 
   const drawerContent = (
@@ -174,9 +169,9 @@ function PatientLayout() {
             })}
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b" }}>
-            {t("portal", {
-              ns: "patientNav",
-              defaultValue: "Patient portal",
+            {t("brand.subtitle", {
+              ns: "common",
+              defaultValue: "Clinic management system",
             })}
           </Typography>
         </Box>
@@ -194,8 +189,8 @@ function PatientLayout() {
           fontWeight: 700,
         }}
       >
-        {t("section", {
-          ns: "patientNav",
+        {t("nav.section", {
+          ns: "doctorLayout",
           defaultValue: "Navigation",
         })}
       </Typography>
@@ -229,13 +224,14 @@ function PatientLayout() {
           >
             <ListItemIcon>{item.icon}</ListItemIcon>
             <ListItemText
-              primary={t(item.key, {
-                ns: "patientNav",
+              primary={t(`nav.${item.key}`, {
+                ns: "doctorLayout",
                 defaultValue: item.key,
               })}
               primaryTypographyProps={{
                 fontWeight: 600,
                 fontSize: 15,
+                textTransform: "capitalize",
               }}
             />
           </ListItemButton>
@@ -258,15 +254,15 @@ function PatientLayout() {
       >
         <Typography sx={{ fontWeight: 700, color: "#0f172a", mb: 0.5 }}>
           {t("promo.title", {
-            ns: "patientNav",
-            defaultValue: "Manage your care",
+            ns: "doctorLayout",
+            defaultValue: "Doctor workspace",
           })}
         </Typography>
         <Typography variant="body2" sx={{ color: "#64748b", lineHeight: 1.6 }}>
           {t("promo.text", {
-            ns: "patientNav",
+            ns: "doctorLayout",
             defaultValue:
-              "Book visits, track appointments, and keep your medical information in one place.",
+              "Review appointments, manage patient records, write visit notes, and track medical documents.",
           })}
         </Typography>
       </Paper>
@@ -318,15 +314,15 @@ function PatientLayout() {
                 sx={{ fontWeight: 700, color: "#0f172a", lineHeight: 1.1 }}
               >
                 {t("topbar.title", {
-                  ns: "patientNav",
-                  defaultValue: "Patient workspace",
+                  ns: "doctorLayout",
+                  defaultValue: "Doctor workspace",
                 })}
               </Typography>
               <Typography variant="body2" sx={{ color: "#64748b" }}>
                 {t("topbar.subtitle", {
-                  ns: "patientNav",
+                  ns: "doctorLayout",
                   defaultValue:
-                    "Manage appointments, documents, and profile details",
+                    "Manage your patients, visits, schedule, and clinical notes",
                 })}
               </Typography>
             </Box>
@@ -374,6 +370,17 @@ function PatientLayout() {
               ))}
             </Paper>
 
+            <IconButton
+              sx={{
+                width: 42,
+                height: 42,
+                background: "rgba(255,255,255,0.55)",
+                border: "1px solid rgba(255,255,255,0.55)",
+              }}
+            >
+              <NotificationsNoneOutlinedIcon />
+            </IconButton>
+
             <Paper
               onClick={handleOpenUserMenu}
               sx={{
@@ -399,26 +406,22 @@ function PatientLayout() {
                     "linear-gradient(135deg, #0f766e 0%, #2563eb 100%)",
                 }}
               >
-                {(currentUserName || "P").charAt(0).toUpperCase()}
+                {(currentUserName || "D").charAt(0).toUpperCase()}
               </Avatar>
 
               <Box sx={{ display: { xs: "none", md: "block" } }}>
                 <Typography
                   sx={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}
                 >
-                  {currentUserName ||
-                    t("patient", {
-                      ns: "patientNav",
-                      defaultValue: "Patient",
-                    })}
+                  {currentUserName}
                 </Typography>
                 <Typography sx={{ fontSize: 12, color: "#64748b" }}>
-                  {currentUserRole === "patient"
-                    ? t("personalWorkspace", {
-                        ns: "patientNav",
-                        defaultValue: "Personal workspace",
+                  {currentUserRole === "doctor"
+                    ? t("roles.doctor", {
+                        ns: "doctorLayout",
+                        defaultValue: "Doctor workspace",
                       })
-                    : "Patient workspace"}
+                    : "Doctor workspace"}
                 </Typography>
               </Box>
             </Paper>
@@ -431,14 +434,14 @@ function PatientLayout() {
               transformOrigin={{ vertical: "top", horizontal: "right" }}
             >
               <MenuItem onClick={handleGoToProfile}>
-                {t("profile", {
-                  ns: "patientNav",
-                  defaultValue: "My profile",
+                {t("user.profile", {
+                  ns: "doctorLayout",
+                  defaultValue: "My patients",
                 })}
               </MenuItem>
               <MenuItem onClick={handleLogout}>
-                {t("logout", {
-                  ns: "patientNav",
+                {t("user.logout", {
+                  ns: "doctorLayout",
                   defaultValue: "Log out",
                 })}
               </MenuItem>
@@ -499,4 +502,4 @@ function PatientLayout() {
   );
 }
 
-export default PatientLayout;
+export default DoctorLayout;

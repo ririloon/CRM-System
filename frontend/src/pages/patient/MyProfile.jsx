@@ -54,7 +54,6 @@ function MyProfile() {
   const { t } = useTranslation(["patientProfile", "common"]);
   const location = useLocation();
 
-  const [profileId, setProfileId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -66,8 +65,8 @@ function MyProfile() {
   const [isEditing, setIsEditing] = useState(false);
 
   const mapPatientToForm = (patient) => ({
-    full_name: patient.full_name || patient.name || "",
-    date_of_birth: patient.birth_date || patient.date_of_birth || "",
+    full_name: patient.name || "",
+    date_of_birth: patient.birth_date || "",
     gender: patient.gender || "",
     phone: patient.phone || "",
     email: patient.email || "",
@@ -82,18 +81,17 @@ function MyProfile() {
 
   useEffect(() => {
     api
-      .get("patients/")
+      .get("patients/me/")
       .then((res) => {
-        const patient = Array.isArray(res.data) ? res.data[0] : res.data;
+        const patient = res.data;
 
         if (patient) {
-          setProfileId(patient.id || null);
           setForm(mapPatientToForm(patient));
 
           const hasRequired =
-            (patient.full_name || patient.name) &&
+            patient.name &&
             patient.phone &&
-            (patient.birth_date || patient.date_of_birth) &&
+            patient.birth_date &&
             patient.gender;
 
           const params = new URLSearchParams(location.search);
@@ -216,7 +214,6 @@ function MyProfile() {
         birth_date: form.date_of_birth,
         gender: form.gender,
         address: form.address,
-        blood_group: form.blood_group,
         allergies: form.allergies,
         chronic_conditions: form.chronic_conditions,
         emergency_contact_name: form.emergency_contact_name,
@@ -224,12 +221,7 @@ function MyProfile() {
         notes: form.notes,
       };
 
-      if (profileId) {
-        await api.patch(`patients/${profileId}/`, payload);
-      } else {
-        const res = await api.post("patients/", payload);
-        setProfileId(res.data?.id || null);
-      }
+      await api.patch("patients/me/", payload);
 
       setSuccessMessage(
         t("success.save", {
@@ -253,7 +245,14 @@ function MyProfile() {
       if (err?.response?.data && typeof err.response.data === "object") {
         const backendErrors = {};
         Object.entries(err.response.data).forEach(([key, value]) => {
-          backendErrors[key] = Array.isArray(value) ? value[0] : String(value);
+          const mappedKey =
+            key === "name"
+              ? "full_name"
+              : key === "birth_date"
+                ? "date_of_birth"
+                : key;
+
+          backendErrors[mappedKey] = Array.isArray(value) ? value[0] : String(value);
         });
         setFieldErrors((prev) => ({ ...prev, ...backendErrors }));
       } else {
@@ -280,12 +279,11 @@ function MyProfile() {
     }
 
     api
-      .get("patients/")
+      .get("patients/me/")
       .then((res) => {
-        const patient = Array.isArray(res.data) ? res.data[0] : res.data;
+        const patient = res.data;
 
         if (patient) {
-          setProfileId(patient.id || null);
           setForm(mapPatientToForm(patient));
         } else {
           setForm(emptyForm);

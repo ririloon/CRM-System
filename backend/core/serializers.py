@@ -47,13 +47,22 @@ class DoctorSerializer(serializers.ModelSerializer):
 
 
 class DoctorScheduleSerializer(serializers.ModelSerializer):
-    doctor = serializers.StringRelatedField()
+    doctor = serializers.StringRelatedField(read_only=True)
+    doctor_id = serializers.PrimaryKeyRelatedField(
+        queryset=Doctor.objects.all(),
+        source="doctor",
+        write_only=True,
+        required=False,
+    )
+    doctor_pk = serializers.IntegerField(source="doctor.id", read_only=True)
 
     class Meta:
         model = DoctorSchedule
         fields = [
             "id",
             "doctor",
+            "doctor_id",
+            "doctor_pk",
             "day_of_week",
             "start_time",
             "end_time",
@@ -121,10 +130,18 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         ]
 
 class PrescriptionSerializer(serializers.ModelSerializer):
+    visit_record_id = serializers.PrimaryKeyRelatedField(
+        queryset=VisitRecord.objects.all(),
+        source="visit_record",
+        write_only=True,
+        required=False,
+    )
+
     class Meta:
         model = Prescription
         fields = [
             "id",
+            "visit_record_id",
             "medication_name",
             "dosage",
             "frequency",

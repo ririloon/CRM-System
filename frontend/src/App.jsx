@@ -3,36 +3,52 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Appointments from "./pages/Appointments";
 import BookAppointment from "./pages/patient/BookAppointment";
 import Dashboard from "./pages/Dashboard";
+import DoctorDashboard from "./pages/doctor/DoctorDashboard";
 import DoctorDetails from "./pages/DoctorDetails";
+import DoctorLayout from "./components/DoctorLayout";
 import Doctors from "./pages/Doctors";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import MyAppointments from "./pages/patient/MyAppointments";
 import MyDocuments from "./pages/patient/MyDocuments";
+import MyPatients from "./pages/doctor/MyPatients";
 import MyProfile from "./pages/patient/MyProfile";
+import MySchedule from "./pages/doctor/MySchedule";
 import PatientDashboard from "./pages/patient/PatientDashboard";
 import PatientDetails from "./pages/PatientDetails";
 import PatientLayout from "./components/PatientLayout";
 import Patients from "./pages/Patients";
 import Register from "./pages/Register";
 import Schedule from "./pages/Schedule";
+import VisitRecords from "./pages/doctor/VisitRecords";
 
-function getDefaultRouteByRole() {
-  const role = localStorage.getItem("userRole");
+function getDefaultRouteByRole(roleFromArg) {
+  const role = roleFromArg || localStorage.getItem("authRole");
 
   if (role === "patient") return "/patient";
-  if (role === "doctor") return "/";
+  if (role === "doctor") return "/doctor";
   return "/";
 }
 
-function PrivateRoute({ children }) {
+function PrivateRoute({ children, allowedRoles = [] }) {
   const token = localStorage.getItem("accessToken");
-  return token ? children : <Navigate to="/login" replace />;
+  const role = localStorage.getItem("authRole");
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+    return <Navigate to={getDefaultRouteByRole(role)} replace />;
+  }
+
+  return children;
 }
 
 function App() {
   const token = localStorage.getItem("accessToken");
-  const defaultRoute = getDefaultRouteByRole();
+  const role = localStorage.getItem("authRole");
+  const defaultRoute = getDefaultRouteByRole(role);
 
   return (
     <BrowserRouter>
@@ -49,7 +65,7 @@ function App() {
 
         <Route
           element={
-            <PrivateRoute>
+            <PrivateRoute allowedRoles={["admin"]}>
               <Layout />
             </PrivateRoute>
           }
@@ -65,9 +81,23 @@ function App() {
         </Route>
 
         <Route
+          path="/doctor"
+          element={
+            <PrivateRoute allowedRoles={["doctor"]}>
+              <DoctorLayout />
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<DoctorDashboard />} />
+          <Route path="patients" element={<MyPatients />} />
+          <Route path="schedule" element={<MySchedule />} />
+          <Route path="records" element={<VisitRecords />} />
+        </Route>
+
+        <Route
           path="/patient"
           element={
-            <PrivateRoute>
+            <PrivateRoute allowedRoles={["patient"]}>
               <PatientLayout />
             </PrivateRoute>
           }
