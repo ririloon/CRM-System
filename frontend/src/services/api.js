@@ -96,6 +96,7 @@ export const getDoctorAvailableSlots = (doctorId, date) =>
 export const getMyAppointments = () => api.get("appointments/my/");
 export const getMyVisitRecords = () => api.get("visit-records/my/");
 export const getMyDocuments = () => api.get("documents/my/");
+export const getDoctorAppointments = () => api.get("doctor/appointments/");
 
 export const getDashboardSummary = () => api.get("dashboard/");
 

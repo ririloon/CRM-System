@@ -2,97 +2,165 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
+  Divider,
+  List,
+  ListItemButton,
+  ListItemText,
   Paper,
   Stack,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
+import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
+import CalendarTodayRoundedIcon from "@mui/icons-material/CalendarTodayRounded";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import Grid from "@mui/material/Grid";
-import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
+import MedicationOutlinedIcon from "@mui/icons-material/MedicationOutlined";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
 import api from "../../services/api";
-import { useTranslation } from "react-i18next";
 
-const panelSx = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: "16px",
-  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+const glassCardSx = {
+  background: "rgba(255, 255, 255, 0.62)",
+  backdropFilter: "blur(18px)",
+  WebkitBackdropFilter: "blur(18px)",
+  border: "1px solid rgba(255, 255, 255, 0.55)",
+  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+  borderRadius: 4,
 };
 
-const itemCardSx = {
-  backgroundColor: "#f8fafc",
-  border: "1px solid #e5e7eb",
-  borderRadius: "14px",
+const softPanelSx = {
+  background: "rgba(255, 255, 255, 0.82)",
+  backdropFilter: "blur(12px)",
+  WebkitBackdropFilter: "blur(12px)",
+  border: "1px solid rgba(255, 255, 255, 0.68)",
+  boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
+  borderRadius: 4,
 };
 
-function MyDocuments() {
-  const { t, i18n } = useTranslation();
+const sectionTitleSx = {
+  fontSize: 15,
+  fontWeight: 700,
+  color: "#0f172a",
+};
+
+const sectionHintSx = {
+  fontSize: 13.5,
+  color: "#64748b",
+  mt: 0.4,
+};
+
+function normalizeVisitRecord(item) {
+  return {
+    id: item.id,
+    appointment: item.appointment,
+    patient: item.patient,
+    doctor: item.doctor,
+    diagnosis: item.diagnosis || "",
+    treatment_plan: item.treatment_plan || "",
+    doctor_notes: item.doctor_notes || "",
+    follow_up_date: item.follow_up_date || "",
+    created_at: item.created_at || "",
+    prescriptions: Array.isArray(item.prescriptions) ? item.prescriptions : [],
+  };
+}
+
+function normalizeDocument(item) {
+  return {
+    id: item.id,
+    patient: item.patient,
+    patient_name: item.patient_name || "Unknown patient",
+    visit_record: item.visit_record,
+    title: item.title || "Document",
+    type: item.document_type || "Medical document",
+    uploaded_at: item.uploaded_at || "",
+    file_url: item.file || "#",
+  };
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "—";
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(dateStr));
+}
+
+export default function MyDocuments() {
+  const [records, setRecords] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [selectedRecordId, setSelectedRecordId] = useState(null);
+
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setPageError("");
+
+    try {
+      const [recordsRes, documentsRes] = await Promise.allSettled([
+        api.get("visit-records/my/"),
+        api.get("medical-documents/my/"),
+      ]);
+
+      const loadedRecords =
+        recordsRes.status === "fulfilled" && Array.isArray(recordsRes.value?.data)
+          ? recordsRes.value.data.map(normalizeVisitRecord)
+          : [];
+
+      const loadedDocuments =
+        documentsRes.status === "fulfilled" && Array.isArray(documentsRes.value?.data)
+          ? documentsRes.value.data.map(normalizeDocument)
+          : [];
+
+      setRecords(loadedRecords);
+      setDocuments(loadedDocuments);
+
+      if (!loadedRecords.length) {
+        setSelectedRecordId(null);
+      } else {
+        setSelectedRecordId((prev) =>
+          loadedRecords.some((r) => r.id === prev) ? prev : loadedRecords[0].id
+        );
+      }
+
+      if (recordsRes.status === "rejected") {
+        setPageError("Could not load visit records.");
+      }
+    } catch (error) {
+      console.error(error);
+      setPageError("Failed to load visit records.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    api
-      .get("medical-documents/")
-      .then((res) => {
-        setDocuments(Array.isArray(res.data) ? res.data : []);
-        setError("");
-      })
-      .catch((err) => {
-        console.error("medical documents error:", err);
-        setError(t("patientDocuments.errors.load", "Failed to load medical documents."));
-      })
-      .finally(() => setLoading(false));
-  }, [t]);
+    loadData();
+  }, [loadData]);
 
-  const metrics = useMemo(() => {
-    return {
-      total: documents.length,
-      withFiles: documents.filter((doc) => Boolean(doc.file)).length,
-      withVisits: documents.filter((doc) => Boolean(doc.visit_record)).length,
-    };
-  }, [documents]);
+  const selectedRecord = useMemo(
+    () => records.find((r) => r.id === selectedRecordId) || null,
+    [records, selectedRecordId]
+  );
 
-  const formatDate = (value) => {
-    if (!value) return "—";
-    try {
-      return new Date(value).toLocaleDateString(
-        i18n.language === "ky" ? "ky-KG" : i18n.language === "en" ? "en-US" : "ru-RU",
-        {
-          dateStyle: "medium",
-        }
-      );
-    } catch {
-      return value;
-    }
-  };
-
-  const openFile = (url) => {
-    if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
+  const relatedDocuments = useMemo(() => {
+    if (!selectedRecordId) return [];
+    return documents.filter(
+      (doc) => String(doc.visit_record) === String(selectedRecordId)
+    );
+  }, [documents, selectedRecordId]);
 
   if (loading) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", mt: 10 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ p: { xs: 1.5, md: 2.5 } }}>
-        <Paper sx={{ ...panelSx, p: 3 }}>
-          <Typography sx={{ color: "#b91c1c", fontWeight: 600 }}>
-            {error}
-          </Typography>
-        </Paper>
+      <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <CircularProgress sx={{ color: "#0f766e" }} />
       </Box>
     );
   }
@@ -101,248 +169,553 @@ function MyDocuments() {
     <Box
       sx={{
         minHeight: "100%",
-        backgroundColor: "#f8fafc",
-        p: { xs: 1.5, md: 2.5 },
+        borderRadius: 5,
+        background: `
+          radial-gradient(circle at 0% 0%, rgba(15, 118, 110, 0.10), transparent 28%),
+          radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.10), transparent 26%),
+          radial-gradient(circle at 100% 100%, rgba(14, 165, 233, 0.08), transparent 24%),
+          linear-gradient(180deg, #f8fbff 0%, #eef5fb 100%)
+        `,
+        p: { xs: 1, md: 1.5 },
       }}
     >
-      <Paper sx={{ ...panelSx, p: { xs: 2, md: 3 }, mb: 2.5 }}>
-        <Typography
+      <Paper
+        sx={{
+          ...glassCardSx,
+          p: { xs: 2.5, md: 3.5 },
+          mb: 3,
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        <Box
           sx={{
-            fontSize: 12,
-            textTransform: "uppercase",
-            letterSpacing: 1,
-            color: "#64748b",
-            fontWeight: 700,
-            mb: 1,
+            position: "absolute",
+            top: -70,
+            right: -50,
+            width: 220,
+            height: 220,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(37,99,235,0.15), transparent 65%)",
+            pointerEvents: "none",
+          }}
+        />
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: -80,
+            left: -30,
+            width: 200,
+            height: 200,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(15,118,110,0.16), transparent 65%)",
+            pointerEvents: "none",
+          }}
+        />
+
+        <Box
+          sx={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 2,
           }}
         >
-          {t("patientDocuments.eyebrow", "Patient documents")}
-        </Typography>
-
-        <Typography
-          sx={{
-            fontSize: { xs: 28, md: 34 },
-            lineHeight: 1.1,
-            fontWeight: 800,
-            color: "#0f172a",
-            mb: 1,
-          }}
-        >
-          {t("patientDocuments.title", "My documents")}
-        </Typography>
-
-        <Typography
-          sx={{
-            color: "#475569",
-            maxWidth: 760,
-            lineHeight: 1.7,
-            fontSize: 15,
-          }}
-        >
-          {t(
-            "patientDocuments.subtitle",
-            "Review files and medical documents that are available for your patient account."
-          )}
-        </Typography>
-      </Paper>
-
-      <Grid container spacing={2.5} sx={{ mb: 2.5 }}>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper sx={{ ...panelSx, p: 2.25 }}>
-            <Typography sx={{ fontSize: 13, color: "#64748b", mb: 1 }}>
-              {t("patientDocuments.metrics.total", "Total documents")}
+          <Box>
+            <Typography
+              variant="overline"
+              sx={{
+                color: "#0f766e",
+                letterSpacing: 1.2,
+                fontWeight: 700,
+              }}
+            >
+              Patient Portal
             </Typography>
-            <Typography sx={{ fontSize: 30, lineHeight: 1, fontWeight: 800, color: "#0f172a" }}>
-              {metrics.total}
-            </Typography>
-          </Paper>
-        </Grid>
 
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper sx={{ ...panelSx, p: 2.25 }}>
-            <Typography sx={{ fontSize: 13, color: "#64748b", mb: 1 }}>
-              {t("patientDocuments.metrics.files", "Available files")}
+            <Typography
+              variant="h4"
+              sx={{
+                mt: 0.5,
+                fontWeight: 800,
+                color: "#0f172a",
+              }}
+            >
+              My Visit Records
             </Typography>
-            <Typography sx={{ fontSize: 30, lineHeight: 1, fontWeight: 800, color: "#0f172a" }}>
-              {metrics.withFiles}
-            </Typography>
-          </Paper>
-        </Grid>
 
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper sx={{ ...panelSx, p: 2.25 }}>
-            <Typography sx={{ fontSize: 13, color: "#64748b", mb: 1 }}>
-              {t("patientDocuments.metrics.visitLinked", "Linked to visits")}
+            <Typography
+              sx={{
+                mt: 1,
+                color: "#475569",
+                maxWidth: 820,
+                lineHeight: 1.7,
+              }}
+            >
+              Review your visit summaries, recommendations, prescriptions,
+              attachments, and follow-up information from your care team.
             </Typography>
-            <Typography sx={{ fontSize: 30, lineHeight: 1, fontWeight: 800, color: "#0f172a" }}>
-              {metrics.withVisits}
-            </Typography>
-          </Paper>
-        </Grid>
-      </Grid>
+          </Box>
 
-      <Paper sx={{ ...panelSx, p: 3 }}>
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
-          <Box
+          <Button
+            variant="outlined"
+            startIcon={<RefreshRoundedIcon />}
+            onClick={loadData}
             sx={{
-              width: 42,
-              height: 42,
-              minWidth: 42,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "12px",
-              backgroundColor: "#f1f5f9",
-              border: "1px solid #e2e8f0",
-              color: "#334155",
+              borderRadius: 3,
+              px: 2.2,
+              py: 1.1,
+              bgcolor: "rgba(255,255,255,0.7)",
             }}
           >
-            <DescriptionOutlinedIcon fontSize="small" />
-          </Box>
+            Refresh
+          </Button>
+        </Box>
+      </Paper>
 
-          <Box>
-            <Typography sx={{ fontSize: 19, fontWeight: 800, color: "#0f172a" }}>
-              {t("patientDocuments.listTitle", "Document list")}
-            </Typography>
-            <Typography sx={{ color: "#64748b", fontSize: 14 }}>
-              {t(
-                "patientDocuments.listSubtitle",
-                "Browse uploaded documents and open available files."
-              )}
-            </Typography>
-          </Box>
-        </Stack>
+      {pageError ? (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {pageError}
+        </Alert>
+      ) : null}
 
-        {documents.length === 0 ? (
-          <Alert severity="info">
-            {t("patientDocuments.empty", "No medical documents are available yet.")}
-          </Alert>
-        ) : (
-          <Stack spacing={1.5}>
-            {documents.map((doc) => (
-              <Box key={doc.id} sx={{ ...itemCardSx, p: 2 }}>
-                <Stack spacing={1.5}>
-                  <Stack
-                    direction={{ xs: "column", md: "row" }}
-                    justifyContent="space-between"
-                    alignItems={{ xs: "flex-start", md: "center" }}
-                    spacing={2}
+      <Box
+        sx={{
+          display: "grid",
+          gap: 2,
+          gridTemplateColumns: {
+            xs: "1fr",
+            xl: "420px minmax(0, 1fr)",
+          },
+          alignItems: "stretch",
+        }}
+      >
+        <Paper sx={{ ...softPanelSx, p: 2, height: "100%" }}>
+          <Stack spacing={2}>
+            <Box>
+              <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+                Visit History
+              </Typography>
+              <Typography variant="body2" sx={{ color: "#64748b", mt: 0.5 }}>
+                Open any completed visit summary to review its details.
+              </Typography>
+            </Box>
+
+            <Divider />
+
+            {records.length ? (
+              <List sx={{ p: 0, display: "grid", gap: 1 }}>
+                {records.map((item) => (
+                  <ListItemButton
+                    key={item.id}
+                    onClick={() => setSelectedRecordId(item.id)}
+                    sx={{
+                      borderRadius: 3,
+                      p: 1.5,
+                      border:
+                        item.id === selectedRecordId
+                          ? "1px solid rgba(37,99,235,0.28)"
+                          : "1px solid rgba(148,163,184,0.16)",
+                      background:
+                        item.id === selectedRecordId
+                          ? "linear-gradient(135deg, rgba(15,118,110,0.08), rgba(37,99,235,0.07))"
+                          : "#fff",
+                      alignItems: "flex-start",
+                    }}
                   >
-                    <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                      <Box
-                        sx={{
-                          width: 40,
-                          height: 40,
-                          minWidth: 40,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          borderRadius: "12px",
-                          backgroundColor: "#ffffff",
-                          border: "1px solid #e2e8f0",
-                          color: "#475569",
-                        }}
-                      >
-                        <InsertDriveFileOutlinedIcon fontSize="small" />
-                      </Box>
-
-                      <Box>
-                        <Typography sx={{ fontWeight: 800, color: "#0f172a", mb: 0.5 }}>
-                          {doc.title || t("patientDocuments.fallbacks.untitled", "Untitled document")}
-                        </Typography>
-
-                        <Typography sx={{ fontSize: 14, color: "#64748b", lineHeight: 1.6 }}>
-                          {doc.description ||
-                            t(
-                              "patientDocuments.fallbacks.noDescription",
-                              "No document description provided."
-                            )}
-                        </Typography>
-                      </Box>
-                    </Stack>
-
-                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                      {doc.file && (
-                        <>
-                          <Button
-                            variant="outlined"
-                            startIcon={<VisibilityOutlinedIcon />}
-                            onClick={() => openFile(doc.file)}
+                    <ListItemText
+                      primary={
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          justifyContent="space-between"
+                          alignItems="center"
+                        >
+                          <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+                            Visit #{item.id}
+                          </Typography>
+                          <Chip
+                            label="Available"
+                            size="small"
                             sx={{
-                              textTransform: "none",
+                              backgroundColor: "rgba(15,118,110,0.10)",
+                              color: "#0f766e",
                               fontWeight: 700,
-                              borderRadius: "12px",
-                              borderColor: "#cbd5e1",
-                              color: "#0f172a",
-                              backgroundColor: "#fff",
+                            }}
+                          />
+                        </Stack>
+                      }
+                      secondary={
+                        <Box sx={{ mt: 1 }}>
+                          <Typography
+                            sx={{
+                              color: "#475569",
+                              fontSize: 13,
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
                             }}
                           >
-                            {t("patientDocuments.actions.view", "View")}
-                          </Button>
-
-                          <Button
-                            variant="contained"
-                            startIcon={<CloudDownloadOutlinedIcon />}
-                            component="a"
-                            href={doc.file}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            sx={{
-                              textTransform: "none",
-                              fontWeight: 700,
-                              borderRadius: "12px",
-                              boxShadow: "none",
-                            }}
+                            {item.doctor_notes || "Visit summary"}
+                          </Typography>
+                          <Typography
+                            sx={{ color: "#94a3b8", fontSize: 12, mt: 0.6 }}
                           >
-                            {t("patientDocuments.actions.download", "Download")}
-                          </Button>
-                        </>
-                      )}
-                    </Stack>
-                  </Stack>
+                            {formatDate(item.created_at)}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            ) : (
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  border: "1px dashed rgba(148,163,184,0.28)",
+                  backgroundColor: "rgba(255,255,255,0.65)",
+                }}
+              >
+                <Typography sx={{ color: "#64748b", fontSize: 14 }}>
+                  No visit records available yet.
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        </Paper>
 
-                  <Grid container spacing={1.5}>
-                    <Grid size={{ xs: 12, md: 4 }}>
-                      <Box sx={{ ...panelSx, p: 1.5, boxShadow: "none" }}>
-                        <Typography sx={{ fontSize: 12, color: "#64748b", mb: 0.5 }}>
-                          {t("patientDocuments.fields.date", "Upload date")}
-                        </Typography>
-                        <Typography sx={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}>
-                          {formatDate(doc.created_at || doc.date_created || doc.uploaded_at)}
-                        </Typography>
-                      </Box>
-                    </Grid>
+        <Paper sx={{ ...softPanelSx, p: { xs: 2, md: 2.5 }, height: "100%" }}>
+          {selectedRecord ? (
+            <Stack spacing={2.5}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 2,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                <Box>
+                  <Typography
+                    sx={{ fontWeight: 800, color: "#0f172a", fontSize: 24 }}
+                  >
+                    Visit Summary
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ color: "#64748b", mt: 0.5 }}
+                  >
+                    Information shared by your doctor after the visit.
+                  </Typography>
+                </Box>
 
-                    <Grid size={{ xs: 12, md: 4 }}>
-                      <Box sx={{ ...panelSx, p: 1.5, boxShadow: "none" }}>
-                        <Typography sx={{ fontSize: 12, color: "#64748b", mb: 0.5 }}>
-                          {t("patientDocuments.fields.type", "Document type")}
-                        </Typography>
-                        <Typography sx={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}>
-                          {doc.document_type || doc.type || "—"}
-                        </Typography>
-                      </Box>
-                    </Grid>
-
-                    <Grid size={{ xs: 12, md: 4 }}>
-                      <Box sx={{ ...panelSx, p: 1.5, boxShadow: "none" }}>
-                        <Typography sx={{ fontSize: 12, color: "#64748b", mb: 0.5 }}>
-                          {t("patientDocuments.fields.visitLink", "Visit record")}
-                        </Typography>
-                        <Typography sx={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}>
-                          {doc.visit_record || "—"}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  </Grid>
+                <Stack direction="row" spacing={1}>
+                  <Chip
+                    icon={<AssignmentOutlinedIcon />}
+                    label={`Record #${selectedRecord.id}`}
+                    sx={{
+                      backgroundColor: "rgba(37,99,235,0.08)",
+                      color: "#1d4ed8",
+                      fontWeight: 700,
+                    }}
+                  />
+                  <Chip
+                    icon={<TaskAltRoundedIcon />}
+                    label="Visible to you"
+                    sx={{
+                      backgroundColor: "rgba(15,118,110,0.10)",
+                      color: "#0f766e",
+                      fontWeight: 700,
+                    }}
+                  />
                 </Stack>
               </Box>
-            ))}
-          </Stack>
-        )}
-      </Paper>
+
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 4,
+                  background: "rgba(255,255,255,0.76)",
+                  border: "1px solid rgba(148,163,184,0.16)",
+                }}
+              >
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                  <CalendarTodayRoundedIcon sx={{ fontSize: 18, color: "#64748b" }} />
+                  <Typography sx={sectionTitleSx}>Visit details</Typography>
+                </Stack>
+                <Typography sx={sectionHintSx}>
+                  Summary created on {formatDate(selectedRecord.created_at)}.
+                </Typography>
+
+                {selectedRecord.follow_up_date ? (
+                  <Box
+                    sx={{
+                      mt: 1.5,
+                      px: 1.5,
+                      py: 1.2,
+                      borderRadius: 3,
+                      background: "rgba(37,99,235,0.05)",
+                      border: "1px solid rgba(37,99,235,0.12)",
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}>
+                      Follow-up date
+                    </Typography>
+                    <Typography sx={{ color: "#64748b", fontSize: 13, mt: 0.35 }}>
+                      {formatDate(selectedRecord.follow_up_date)}
+                    </Typography>
+                  </Box>
+                ) : null}
+              </Box>
+
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 4,
+                  background: "rgba(255,255,255,0.76)",
+                  border: "1px solid rgba(148,163,184,0.16)",
+                }}
+              >
+                <Typography sx={sectionTitleSx}>Clinical note</Typography>
+                <Typography sx={sectionHintSx}>
+                  Main summary from your doctor.
+                </Typography>
+
+                <Typography
+                  sx={{
+                    mt: 1.5,
+                    color: "#0f172a",
+                    lineHeight: 1.8,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {selectedRecord.doctor_notes || "No note provided."}
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 4,
+                  background: "rgba(255,255,255,0.76)",
+                  border: "1px solid rgba(148,163,184,0.16)",
+                }}
+              >
+                <Typography sx={sectionTitleSx}>Recommendation</Typography>
+                <Typography sx={sectionHintSx}>
+                  Care plan, treatment advice, or next steps.
+                </Typography>
+
+                <Typography
+                  sx={{
+                    mt: 1.5,
+                    color: "#0f172a",
+                    lineHeight: 1.8,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {selectedRecord.treatment_plan || "No recommendation provided."}
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 4,
+                  background: "rgba(255,255,255,0.76)",
+                  border: "1px solid rgba(148,163,184,0.16)",
+                }}
+              >
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <MedicationOutlinedIcon sx={{ fontSize: 18, color: "#0f766e" }} />
+                  <Typography sx={sectionTitleSx}>Prescriptions</Typography>
+                </Stack>
+                <Typography sx={sectionHintSx}>
+                  Medications added to this visit summary.
+                </Typography>
+
+                <Stack spacing={1.2} sx={{ mt: 1.5 }}>
+                  {selectedRecord.prescriptions?.length ? (
+                    selectedRecord.prescriptions.map((item, index) => (
+                      <Box
+                        key={item.id || index}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          border: "1px solid rgba(148,163,184,0.18)",
+                          backgroundColor: "#fff",
+                        }}
+                      >
+                        <Typography
+                          sx={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}
+                        >
+                          {item.medication_name || `Medication ${index + 1}`}
+                        </Typography>
+
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={1.2}
+                          sx={{ mt: 1, flexWrap: "wrap" }}
+                        >
+                          {item.dosage ? (
+                            <Chip
+                              label={`Dosage: ${item.dosage}`}
+                              size="small"
+                              sx={{ width: "fit-content" }}
+                            />
+                          ) : null}
+                          {item.frequency ? (
+                            <Chip
+                              label={`Frequency: ${item.frequency}`}
+                              size="small"
+                              sx={{ width: "fit-content" }}
+                            />
+                          ) : null}
+                          {item.duration ? (
+                            <Chip
+                              label={`Duration: ${item.duration}`}
+                              size="small"
+                              sx={{ width: "fit-content" }}
+                            />
+                          ) : null}
+                        </Stack>
+
+                        {item.instructions ? (
+                          <Typography
+                            sx={{ color: "#475569", fontSize: 13.5, mt: 1.2 }}
+                          >
+                            {item.instructions}
+                          </Typography>
+                        ) : null}
+                      </Box>
+                    ))
+                  ) : (
+                    <Typography sx={{ color: "#94a3b8", fontSize: 13.5 }}>
+                      No prescriptions were added for this visit.
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
+
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 4,
+                  background: "rgba(255,255,255,0.76)",
+                  border: "1px solid rgba(148,163,184,0.16)",
+                }}
+              >
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <AttachFileOutlinedIcon sx={{ fontSize: 18, color: "#2563eb" }} />
+                  <Typography sx={sectionTitleSx}>Attachments</Typography>
+                </Stack>
+                <Typography sx={sectionHintSx}>
+                  Files shared with you for this visit.
+                </Typography>
+
+                <Stack spacing={1.2} sx={{ mt: 1.5 }}>
+                  {relatedDocuments.length ? (
+                    relatedDocuments.map((doc) => (
+                      <Box
+                        key={doc.id}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          border: "1px solid rgba(148,163,184,0.18)",
+                          backgroundColor: "#fff",
+                        }}
+                      >
+                        <Stack
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          spacing={1}
+                        >
+                          <Stack direction="row" spacing={1.1} alignItems="center">
+                            <Box
+                              sx={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 2.5,
+                                display: "grid",
+                                placeItems: "center",
+                                background:
+                                  "linear-gradient(135deg, rgba(15,118,110,0.12), rgba(37,99,235,0.10))",
+                                color: "#0f766e",
+                              }}
+                            >
+                              <DescriptionOutlinedIcon fontSize="small" />
+                            </Box>
+
+                            <Box>
+                              <Typography
+                                sx={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}
+                              >
+                                {doc.title}
+                              </Typography>
+                              <Typography
+                                sx={{ color: "#64748b", fontSize: 12.5, mt: 0.2 }}
+                              >
+                                {doc.type} • {formatDate(doc.uploaded_at)}
+                              </Typography>
+                            </Box>
+                          </Stack>
+
+                          <IconButton
+                            component="a"
+                            href={doc.file_url || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            size="small"
+                            sx={{ color: "#2563eb" }}
+                          >
+                            <DownloadOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </Box>
+                    ))
+                  ) : (
+                    <Typography sx={{ color: "#94a3b8", fontSize: 13.5 }}>
+                      No attachments were shared for this visit.
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
+            </Stack>
+          ) : (
+            <Box
+              sx={{
+                minHeight: 420,
+                display: "grid",
+                placeItems: "center",
+                textAlign: "center",
+                px: 3,
+              }}
+            >
+              <Box>
+                <AssignmentOutlinedIcon
+                  sx={{ fontSize: 40, color: "#cbd5e1", mb: 1.5 }}
+                />
+                <Typography sx={{ color: "#94a3b8", fontWeight: 700 }}>
+                  No visit selected
+                </Typography>
+                <Typography sx={{ color: "#cbd5e1", fontSize: 13, mt: 0.5 }}>
+                  Choose a visit record from the left to view its summary
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </Paper>
+      </Box>
     </Box>
   );
 }
-
-export default MyDocuments;

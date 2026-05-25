@@ -350,16 +350,6 @@ function Layout() {
               ))}
             </Paper>
 
-            <IconButton
-              sx={{
-                width: 42,
-                height: 42,
-                background: "rgba(255,255,255,0.55)",
-                border: "1px solid rgba(255,255,255,0.55)",
-              }}
-            >
-              <NotificationsNoneOutlinedIcon />
-            </IconButton>
 
             <Paper
               onClick={handleOpenUserMenu}

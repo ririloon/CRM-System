@@ -11,471 +11,666 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
-import AssignmentTurnedInRoundedIcon from "@mui/icons-material/AssignmentTurnedInRounded";
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import CalendarTodayRoundedIcon from "@mui/icons-material/CalendarTodayRounded";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
 import Grid from "@mui/material/Grid";
 import Groups2RoundedIcon from "@mui/icons-material/Groups2Rounded";
-import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
-import { useNavigate } from "react-router-dom";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import api from "../../services/api";
 
-function formatDateTime(value) {
-  if (!value) return "—";
-  const date = new Date(value);
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function formatTimeOnly(value) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function getStatusMeta(status) {
+function StatusChip({ status }) {
   const map = {
-    scheduled: { bg: "#dbeafe", color: "#1d4ed8", label: "Scheduled" },
-    confirmed: { bg: "#dcfce7", color: "#166534", label: "Confirmed" },
-    completed: { bg: "#ede9fe", color: "#5b21b6", label: "Completed" },
-    cancelled: { bg: "#fee2e2", color: "#b91c1c", label: "Cancelled" },
-    no_show: { bg: "#fef3c7", color: "#92400e", label: "No show" },
+    scheduled:  { label: "Scheduled",  bg: "#dbeafe", color: "#1d4ed8" },
+    confirmed:  { label: "Confirmed",  bg: "#dcfce7", color: "#166534" },
+    completed:  { label: "Completed",  bg: "#ede9fe", color: "#6d28d9" },
+    cancelled:  { label: "Cancelled",  bg: "#fee2e2", color: "#b91c1c" },
+    no_show:    { label: "No show",    bg: "#fef3c7", color: "#92400e" },
   };
-  return map[status] || { bg: "#e2e8f0", color: "#334155", label: status || "Unknown" };
+  const s = map[status] || { label: status || "—", bg: "#e2e8f0", color: "#475569" };
+  return (
+    <Chip
+      label={s.label}
+      size="small"
+      sx={{ bgcolor: s.bg, color: s.color, fontWeight: 700, borderRadius: 999 }}
+    />
+  );
 }
 
-function StatCard({ title, value, icon, color, subtitle }) {
+function KpiCard({ icon, label, value, sub, color }) {
   return (
     <Paper
       sx={{
         p: 2.5,
         borderRadius: 4,
         border: "1px solid #e2e8f0",
-        boxShadow: "0 4px 24px rgba(15,23,42,0.06)",
+        boxShadow: "0 4px 20px rgba(15,23,42,0.06)",
         height: "100%",
-        transition: "box-shadow 0.2s",
-        "&:hover": { boxShadow: "0 8px 32px rgba(15,23,42,0.10)" },
       }}
     >
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-        <Box>
-          <Typography sx={{ color: "#64748b", fontSize: 13, mb: 1, fontWeight: 500 }}>
-            {title}
-          </Typography>
-          <Typography sx={{ fontSize: 30, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>
-            {value}
-          </Typography>
-          <Typography sx={{ color: "#94a3b8", fontSize: 12.5, mt: 0.8 }}>
-            {subtitle}
-          </Typography>
-        </Box>
+      <Stack direction="row" spacing={2} alignItems="flex-start">
         <Box
           sx={{
             width: 46,
             height: 46,
+            borderRadius: 3,
+            bgcolor: `${color}18`,
+            color,
             display: "grid",
             placeItems: "center",
-            borderRadius: 3,
-            bgcolor: `${color}16`,
-            color,
             flexShrink: 0,
           }}
         >
           {icon}
+        </Box>
+        <Box>
+          <Typography sx={{ fontSize: 13, color: "#64748b", mb: 0.5 }}>{label}</Typography>
+          <Typography sx={{ fontSize: 26, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>
+            {value ?? "—"}
+          </Typography>
+          {sub && (
+            <Typography sx={{ fontSize: 13, color: "#94a3b8", mt: 0.5 }}>{sub}</Typography>
+          )}
         </Box>
       </Stack>
     </Paper>
   );
 }
 
-function DoctorDashboard() {
-  const navigate = useNavigate();
+export default function DoctorDashboard() {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [doctor, setDoctor] = useState(null);
-  const [appointments, setAppointments] = useState([]);
-  const [schedules, setSchedules] = useState([]);
+  const [error, setError]     = useState("");
+  const [data, setData]       = useState(null);
+  const [doctorName, setDoctorName] = useState("");
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        // FIX: appointments/my/ already filters by current doctor on backend
-        // No need to manually match doctor — backend get_queryset() handles it
-        const [meRes, appointmentsRes, schedulesRes] = await Promise.all([
-          api.get("auth/me/"),
-          api.get("appointments/my/"),
-          api.get("doctor-schedules/"),
-        ]);
-
-        const me = meRes.data || {};
-        setDoctor({ name: me.full_name || me.username || "Doctor" });
-        setAppointments(Array.isArray(appointmentsRes.data) ? appointmentsRes.data : []);
-        setSchedules(Array.isArray(schedulesRes.data) ? schedulesRes.data : []);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load doctor dashboard");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
-
-  const now = useMemo(() => new Date(), []);
-
-  const todayAppointments = useMemo(() => {
-    return appointments
-      .filter((a) => {
-        const d = new Date(a.date);
-        return (
-          d.getFullYear() === now.getFullYear() &&
-          d.getMonth() === now.getMonth() &&
-          d.getDate() === now.getDate()
-        );
-      })
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
-  }, [appointments, now]);
-
-  const upcomingAppointments = useMemo(() => {
-    return [...appointments]
-      .filter((a) => new Date(a.date) >= now)
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .slice(0, 8);
-  }, [appointments, now]);
-
-  const uniquePatientsCount = useMemo(() => {
-    const ids = new Set(
-      appointments.map((a) => a.patient?.id ?? a.patient).filter(Boolean)
-    );
-    return ids.size;
-  }, [appointments]);
-
-  const completedCount = appointments.filter((a) => a.status === "completed").length;
-  const confirmedCount = appointments.filter((a) => a.status === "confirmed").length;
-  const scheduledCount = appointments.filter((a) => a.status === "scheduled").length;
-  const completionRate = appointments.length
-    ? Math.round((completedCount / appointments.length) * 100)
-    : 0;
-
-  // Weekly trend: appointments per day for next 7 days
-  const weeklyTrend = useMemo(() => {
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() + i);
-      const count = appointments.filter((a) => {
-        const ad = new Date(a.date);
-        return (
-          ad.getFullYear() === d.getFullYear() &&
-          ad.getMonth() === d.getMonth() &&
-          ad.getDate() === d.getDate()
-        );
-      }).length;
-      days.push({
-        label: i === 0 ? "Today" : new Intl.DateTimeFormat("en", { weekday: "short" }).format(d),
-        count,
-        date: d,
-      });
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const [meRes, dashRes] = await Promise.all([
+        api.get("auth/me/"),
+        api.get("dashboard/"),
+      ]);
+      setDoctorName(meRes.data?.full_name || meRes.data?.username || "Doctor");
+      setData(dashRes.data);
+    } catch {
+      setError("Failed to load dashboard data. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    return days;
-  }, [appointments, now]);
+  };
 
-  const maxWeeklyCount = Math.max(...weeklyTrend.map((d) => d.count), 1);
+  useEffect(() => { load(); }, []);
 
   if (loading) {
     return (
       <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
-        <CircularProgress />
+        <CircularProgress sx={{ color: "#0f766e" }} />
       </Box>
     );
   }
 
+  const today      = data?.today_schedule_preview  || [];
+  const recent     = data?.recent_appointments     || [];
+  const trend      = data?.weekly_trend            || [];
+  const byStatus   = data?.appointments_by_status  || {};
+
+  const statusColors = {
+    confirmed: "#0f766e",
+    completed: "#6d28d9",
+    cancelled: "#dc2626",
+    no_show:   "#d97706",
+  };
+
+  const totalByStatus = Object.values(byStatus).reduce((a, b) => a + b, 0) || 1;
+  const trendMax = Math.max(...trend.map((t) => t.count), 1);
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, background: "#f8fafc", minHeight: "100vh" }}>
       <Stack spacing={3}>
-        {error && <Alert severity="error">{error}</Alert>}
+        {error && (
+          <Alert
+            severity="error"
+            action={
+              <Button size="small" onClick={load} startIcon={<RefreshRoundedIcon />}>
+                Retry
+              </Button>
+            }
+          >
+            {error}
+          </Alert>
+        )}
 
-        {/* HERO */}
+        {/* ── Hero ── */}
         <Paper
           sx={{
             p: { xs: 2.5, md: 3.5 },
             borderRadius: 5,
+            background: "linear-gradient(135deg, #0f766e 0%, #0f172a 60%, #1e40af 100%)",
             color: "#fff",
+            boxShadow: "0 16px 48px rgba(15,23,42,0.18)",
             overflow: "hidden",
             position: "relative",
-            background: "linear-gradient(135deg, #0f766e 0%, #0f172a 58%, #1d4ed8 100%)",
-            boxShadow: "0 20px 50px rgba(15, 23, 42, 0.18)",
           }}
         >
-          <Box sx={{ position: "absolute", right: -50, top: -50, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.06)" }} />
-          <Box sx={{ position: "absolute", right: 60, bottom: -70, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.04)" }} />
-          <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }} spacing={2} sx={{ position: "relative", zIndex: 1 }}>
+          {[
+            { size: 220, right: -50, top: -50, opacity: 0.08 },
+            { size: 160, right: 100, bottom: -60, opacity: 0.06 },
+          ].map((c, i) => (
+            <Box
+              key={i}
+              sx={{
+                position: "absolute",
+                width: c.size,
+                height: c.size,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,1)",
+                opacity: c.opacity,
+                right: c.right,
+                top: c.top,
+                bottom: c.bottom,
+              }}
+            />
+          ))}
+
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", md: "center" }}
+            spacing={2}
+            sx={{ position: "relative", zIndex: 1 }}
+          >
             <Box>
-              <Typography sx={{ opacity: 0.75, fontSize: 13, mb: 0.8, letterSpacing: 0.5, textTransform: "uppercase" }}>
+              <Typography sx={{ opacity: 0.75, fontSize: 13, mb: 0.8 }}>
                 Doctor workspace
               </Typography>
-              <Typography sx={{ fontSize: { xs: 26, md: 32 }, fontWeight: 800, mb: 1, lineHeight: 1.2 }}>
-                {doctor?.name ? `Welcome, ${doctor.name}` : "Welcome, Doctor"}
+              <Typography sx={{ fontSize: { xs: 24, md: 32 }, fontWeight: 800 }}>
+                Welcome back, Dr. {doctorName}
               </Typography>
-              <Stack direction="row" spacing={2} sx={{ opacity: 0.9 }}>
-                <Typography sx={{ fontSize: 14 }}>📅 {todayAppointments.length} today</Typography>
-                <Typography sx={{ fontSize: 14 }}>👥 {uniquePatientsCount} patients</Typography>
-                <Typography sx={{ fontSize: 14 }}>✅ {completionRate}% completion</Typography>
-              </Stack>
+              <Typography sx={{ opacity: 0.82, mt: 0.8, maxWidth: 560 }}>
+                Your daily clinical overview — appointments, patients, tasks and analytics.
+              </Typography>
             </Box>
-            <Stack direction={{ xs: "row", md: "column" }} spacing={1}>
+            <Stack direction={{ xs: "row", md: "row" }} spacing={1.2}>
               <Button
-                onClick={() => navigate("/doctor/schedule")}
                 variant="contained"
-                startIcon={<CalendarMonthRoundedIcon />}
-                sx={{ bgcolor: "rgba(255,255,255,0.18)", color: "#fff", fontWeight: 700, borderRadius: 3, boxShadow: "none", border: "1px solid rgba(255,255,255,0.25)", "&:hover": { bgcolor: "rgba(255,255,255,0.28)", boxShadow: "none" }, whiteSpace: "nowrap" }}
+                sx={{
+                  bgcolor: "#fff",
+                  color: "#0f172a",
+                  fontWeight: 700,
+                  borderRadius: 3,
+                  boxShadow: "none",
+                  "&:hover": { bgcolor: "#e2e8f0", boxShadow: "none" },
+                }}
               >
-                My Schedule
+                Open schedule
+              </Button>
+              <Button
+                variant="outlined"
+                sx={{
+                  borderColor: "rgba(255,255,255,0.35)",
+                  color: "#fff",
+                  fontWeight: 700,
+                  borderRadius: 3,
+                  "&:hover": { borderColor: "#fff", bgcolor: "rgba(255,255,255,0.08)" },
+                }}
+              >
+                Patient records
               </Button>
             </Stack>
           </Stack>
         </Paper>
 
-        {/* KPI CARDS */}
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-            <StatCard title="Appointments today" value={todayAppointments.length} subtitle="Scheduled for today" color="#2563eb" icon={<EventAvailableRoundedIcon />} />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-            <StatCard title="Active patients" value={uniquePatientsCount} subtitle="Unique patients total" color="#0f766e" icon={<Groups2RoundedIcon />} />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-            <StatCard title="Pending" value={scheduledCount + confirmedCount} subtitle={`${scheduledCount} scheduled · ${confirmedCount} confirmed`} color="#d97706" icon={<PendingActionsRoundedIcon />} />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-            <StatCard title="Completion rate" value={`${completionRate}%`} subtitle={`${completedCount} completed`} color="#16a34a" icon={<TrendingUpRoundedIcon />} />
-          </Grid>
+        {/* ── KPI cards ── */}
+        <Grid container spacing={2.2}>
+          {[
+            {
+              icon: <CalendarTodayRoundedIcon />,
+              label: "Today's appointments",
+              value: data?.today_appointments_count,
+              sub: "scheduled for today",
+              color: "#2563eb",
+            },
+            {
+              icon: <EventAvailableRoundedIcon />,
+              label: "This week",
+              value: data?.week_appointments_count,
+              sub: "next 7 days",
+              color: "#0f766e",
+            },
+            {
+              icon: <CheckCircleOutlineRoundedIcon />,
+              label: "Completed",
+              value: data?.completed_appointments_count,
+              sub: "all time",
+              color: "#7c3aed",
+            },
+            {
+              icon: <Groups2RoundedIcon />,
+              label: "Total appointments",
+              value: data?.total_appointments_count,
+              sub: "in the system",
+              color: "#ea580c",
+            },
+          ].map((k) => (
+            <Grid key={k.label} size={{ xs: 12, sm: 6, xl: 3 }}>
+              <KpiCard {...k} />
+            </Grid>
+          ))}
         </Grid>
 
-        <Grid container spacing={2.5}>
-          {/* TODAY'S APPOINTMENTS */}
+        {/* ── Today schedule + Alerts ── */}
+        <Grid container spacing={2.2}>
           <Grid size={{ xs: 12, xl: 8 }}>
-            <Paper sx={{ p: 2.5, borderRadius: 4, border: "1px solid #e2e8f0", boxShadow: "0 4px 24px rgba(15,23,42,0.05)", height: "100%" }}>
+            <Paper
+              sx={{
+                p: 2.5,
+                borderRadius: 4,
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 4px 20px rgba(15,23,42,0.05)",
+                height: "100%",
+              }}
+            >
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5 }}>
                 <Box>
-                  <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 17 }}>Today's appointments</Typography>
+                  <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 17 }}>
+                    Today's appointments
+                  </Typography>
                   <Typography sx={{ color: "#64748b", fontSize: 13.5, mt: 0.3 }}>
-                    {todayAppointments.length === 0 ? "No appointments today" : `${todayAppointments.length} appointment${todayAppointments.length > 1 ? "s" : ""} scheduled`}
+                    {today.length
+                      ? `${today.length} consultations scheduled`
+                      : "No appointments today"}
                   </Typography>
                 </Box>
-                <Button endIcon={<ArrowForwardRoundedIcon />} onClick={() => navigate("/doctor/schedule")} sx={{ textTransform: "none", fontWeight: 700, color: "#0f766e", fontSize: 13.5 }}>
-                  Full schedule
-                </Button>
+                <Chip
+                  label={`${today.length} total`}
+                  size="small"
+                  sx={{ fontWeight: 700, bgcolor: "#eff6ff", color: "#1d4ed8", borderRadius: 999 }}
+                />
               </Stack>
 
-              {todayAppointments.length === 0 ? (
-                <Box sx={{ py: 5, display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
-                  <AssignmentTurnedInRoundedIcon sx={{ fontSize: 44, color: "#cbd5e1" }} />
-                  <Typography sx={{ color: "#94a3b8", fontWeight: 600 }}>No appointments today</Typography>
-                  <Typography sx={{ color: "#cbd5e1", fontSize: 13 }}>Check your upcoming schedule below</Typography>
+              {today.length === 0 ? (
+                <Box
+                  sx={{
+                    py: 5,
+                    textAlign: "center",
+                    border: "1px dashed #cbd5e1",
+                    borderRadius: 3,
+                  }}
+                >
+                  <Typography sx={{ color: "#94a3b8", fontSize: 14 }}>
+                    No appointments scheduled for today
+                  </Typography>
                 </Box>
               ) : (
-                <Stack divider={<Divider flexItem sx={{ borderColor: "#f1f5f9" }} />}>
-                  {todayAppointments.map((item, idx) => {
-                    const status = getStatusMeta(item.status);
-                    return (
-                      <Stack key={item.id} direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5} sx={{ py: 1.6 }}>
-                        <Stack direction="row" spacing={1.5} alignItems="center">
-                          <Box sx={{ width: 36, height: 36, borderRadius: "50%", bgcolor: "#0f766e15", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                            <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0f766e" }}>#{idx + 1}</Typography>
-                          </Box>
-                          <Avatar sx={{ width: 38, height: 38, bgcolor: "#dbeafe", color: "#1d4ed8" }}>
-                            <PersonOutlineRoundedIcon sx={{ fontSize: 20 }} />
-                          </Avatar>
-                          <Box>
-                            <Typography sx={{ fontWeight: 700, color: "#0f172a", fontSize: 14.5 }}>
-                              {item.patient_name || `Patient #${item.patient}`}
-                            </Typography>
-                            <Typography sx={{ color: "#64748b", fontSize: 13 }}>
-                              {item.complaint || "No complaint specified"}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                        <Stack direction="row" spacing={1.2} alignItems="center" sx={{ flexShrink: 0 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.6, bgcolor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 2, px: 1.2, py: 0.5 }}>
-                            <AccessTimeRoundedIcon sx={{ fontSize: 14, color: "#64748b" }} />
-                            <Typography sx={{ fontWeight: 700, color: "#0f172a", fontSize: 13.5 }}>
-                              {formatTimeOnly(item.date)}
-                            </Typography>
-                          </Box>
-                          <Chip label={status.label} size="small" sx={{ bgcolor: status.bg, color: status.color, fontWeight: 700, borderRadius: 999, fontSize: 12 }} />
-                        </Stack>
+                <Stack divider={<Divider flexItem />}>
+                  {today.map((item, idx) => (
+                    <Stack
+                      key={item.id}
+                      direction={{ xs: "column", sm: "row" }}
+                      justifyContent="space-between"
+                      alignItems={{ xs: "flex-start", sm: "center" }}
+                      spacing={1.5}
+                      sx={{ py: 1.8 }}
+                    >
+                      <Stack direction="row" spacing={2} alignItems="center">
+                        <Avatar
+                          sx={{
+                            width: 38,
+                            height: 38,
+                            bgcolor: "#eff6ff",
+                            color: "#1d4ed8",
+                            fontSize: 14,
+                            fontWeight: 800,
+                          }}
+                        >
+                          {idx + 1}
+                        </Avatar>
+                        <Box>
+                          <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+                            {item.patient_name || `Patient #${item.patient}`}
+                          </Typography>
+                          <Typography sx={{ color: "#64748b", fontSize: 13.5 }}>
+                            {new Intl.DateTimeFormat("ru-RU", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              day: "2-digit",
+                              month: "short",
+                            }).format(new Date(item.date))}
+                          </Typography>
+                        </Box>
                       </Stack>
-                    );
-                  })}
+                      <StatusChip status={item.status} />
+                    </Stack>
+                  ))}
                 </Stack>
-              )}
-
-              {/* UPCOMING (if no today OR as extra section) */}
-              {upcomingAppointments.filter(a => {
-                const d = new Date(a.date);
-                return !(
-                  d.getFullYear() === now.getFullYear() &&
-                  d.getMonth() === now.getMonth() &&
-                  d.getDate() === now.getDate()
-                );
-              }).length > 0 && (
-                <>
-                  <Divider sx={{ my: 2, borderColor: "#e2e8f0" }} />
-                  <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 15, mb: 1.5 }}>Upcoming</Typography>
-                  <Stack divider={<Divider flexItem sx={{ borderColor: "#f1f5f9" }} />}>
-                    {upcomingAppointments
-                      .filter(a => {
-                        const d = new Date(a.date);
-                        return !(
-                          d.getFullYear() === now.getFullYear() &&
-                          d.getMonth() === now.getMonth() &&
-                          d.getDate() === now.getDate()
-                        );
-                      })
-                      .slice(0, 5)
-                      .map((item) => {
-                        const status = getStatusMeta(item.status);
-                        return (
-                          <Stack key={item.id} direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5} sx={{ py: 1.4 }}>
-                            <Stack direction="row" spacing={1.5} alignItems="center">
-                              <Avatar sx={{ width: 36, height: 36, bgcolor: "#f1f5f9", color: "#475569" }}>
-                                <PersonOutlineRoundedIcon sx={{ fontSize: 18 }} />
-                              </Avatar>
-                              <Box>
-                                <Typography sx={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}>
-                                  {item.patient_name || `Patient #${item.patient}`}
-                                </Typography>
-                                <Typography sx={{ color: "#64748b", fontSize: 13 }}>
-                                  {item.complaint || "—"}
-                                </Typography>
-                              </Box>
-                            </Stack>
-                            <Stack direction="row" spacing={1.2} alignItems="center" sx={{ flexShrink: 0 }}>
-                              <Typography sx={{ fontWeight: 600, color: "#475569", fontSize: 13 }}>
-                                {formatDateTime(item.date)}
-                              </Typography>
-                              <Chip label={status.label} size="small" sx={{ bgcolor: status.bg, color: status.color, fontWeight: 700, borderRadius: 999, fontSize: 12 }} />
-                            </Stack>
-                          </Stack>
-                        );
-                    })}
-                  </Stack>
-                </>
               )}
             </Paper>
           </Grid>
 
-          {/* RIGHT COLUMN */}
           <Grid size={{ xs: 12, xl: 4 }}>
-            <Stack spacing={2.5}>
-              {/* STATUS BREAKDOWN */}
-              <Paper sx={{ p: 2.5, borderRadius: 4, border: "1px solid #e2e8f0", boxShadow: "0 4px 24px rgba(15,23,42,0.05)" }}>
+            <Stack spacing={2.2} sx={{ height: "100%" }}>
+              {/* Daily progress */}
+              <Paper
+                sx={{
+                  p: 2.5,
+                  borderRadius: 4,
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 4px 20px rgba(15,23,42,0.05)",
+                }}
+              >
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                  <CheckCircleOutlineRoundedIcon sx={{ color: "#0f766e", fontSize: 20 }} />
-                  <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 16 }}>Status breakdown</Typography>
+                  <TrendingUpRoundedIcon sx={{ color: "#0f766e" }} />
+                  <Typography sx={{ fontWeight: 800, color: "#0f172a" }}>
+                    Completion rate
+                  </Typography>
                 </Stack>
-                <Stack spacing={1.6}>
-                  {[
-                    { label: "Scheduled", value: scheduledCount, color: "#2563eb", bg: "#dbeafe" },
-                    { label: "Confirmed", value: confirmedCount, color: "#16a34a", bg: "#dcfce7" },
-                    { label: "Completed", value: completedCount, color: "#7c3aed", bg: "#ede9fe" },
-                    { label: "Cancelled", value: appointments.filter(a => a.status === "cancelled").length, color: "#b91c1c", bg: "#fee2e2" },
-                  ].map((item) => (
-                    <Box key={item.label}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.6 }}>
-                        <Stack direction="row" spacing={0.8} alignItems="center">
-                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: item.color }} />
-                          <Typography sx={{ fontSize: 13.5, color: "#334155", fontWeight: 600 }}>{item.label}</Typography>
-                        </Stack>
-                        <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 14 }}>{item.value}</Typography>
-                      </Stack>
+                {(() => {
+                  const total     = data?.total_appointments_count || 0;
+                  const completed = data?.completed_appointments_count || 0;
+                  const pct       = total > 0 ? Math.round((completed / total) * 100) : 0;
+                  return (
+                    <>
+                      <Typography sx={{ fontSize: 28, fontWeight: 800, color: "#0f172a" }}>
+                        {pct}%
+                      </Typography>
+                      <Typography sx={{ color: "#64748b", fontSize: 13.5, mb: 1.5 }}>
+                        {completed} of {total} appointments completed
+                      </Typography>
                       <LinearProgress
                         variant="determinate"
-                        value={appointments.length ? (item.value / appointments.length) * 100 : 0}
-                        sx={{ height: 7, borderRadius: 999, bgcolor: "#f1f5f9", "& .MuiLinearProgress-bar": { borderRadius: 999, bgcolor: item.color } }}
+                        value={pct}
+                        sx={{
+                          height: 10,
+                          borderRadius: 999,
+                          bgcolor: "#e2e8f0",
+                          "& .MuiLinearProgress-bar": {
+                            borderRadius: 999,
+                            bgcolor: "#0f766e",
+                          },
+                        }}
                       />
+                    </>
+                  );
+                })()}
+              </Paper>
+
+              {/* Alerts */}
+              <Paper
+                sx={{
+                  p: 2.5,
+                  borderRadius: 4,
+                  border: "1px solid #fef3c7",
+                  bgcolor: "#fffbeb",
+                  boxShadow: "0 4px 20px rgba(15,23,42,0.04)",
+                  flex: 1,
+                }}
+              >
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                  <WarningAmberRoundedIcon sx={{ color: "#d97706" }} />
+                  <Typography sx={{ fontWeight: 800, color: "#0f172a" }}>
+                    Attention required
+                  </Typography>
+                </Stack>
+                <Stack spacing={1.2}>
+                  {[
+                    {
+                      text: `${data?.cancelled_appointments_count ?? 0} cancelled appointments`,
+                      color: "#dc2626",
+                      bg: "#fee2e2",
+                    },
+                    {
+                      text: `${data?.no_show_appointments_count ?? 0} no-show patients`,
+                      color: "#d97706",
+                      bg: "#fef3c7",
+                    },
+                    {
+                      text: `${data?.future_appointments_count ?? 0} upcoming appointments`,
+                      color: "#2563eb",
+                      bg: "#dbeafe",
+                    },
+                  ].map((a) => (
+                    <Box
+                      key={a.text}
+                      sx={{
+                        px: 1.5,
+                        py: 1,
+                        borderRadius: 2.5,
+                        bgcolor: a.bg,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: a.color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a" }}>
+                        {a.text}
+                      </Typography>
                     </Box>
                   ))}
                 </Stack>
               </Paper>
+            </Stack>
+          </Grid>
+        </Grid>
 
-              {/* WEEKLY TREND */}
-              <Paper sx={{ p: 2.5, borderRadius: 4, border: "1px solid #e2e8f0", boxShadow: "0 4px 24px rgba(15,23,42,0.05)" }}>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                  <TrendingUpRoundedIcon sx={{ color: "#2563eb", fontSize: 20 }} />
-                  <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 16 }}>7-day forecast</Typography>
-                </Stack>
-                <Stack spacing={1.2}>
-                  {weeklyTrend.map((day, i) => (
-                    <Stack key={i} direction="row" spacing={1.5} alignItems="center">
-                      <Typography sx={{ width: 42, color: i === 0 ? "#0f766e" : "#64748b", fontWeight: i === 0 ? 800 : 600, fontSize: 13 }}>
-                        {day.label}
+        {/* ── Analytics row ── */}
+        <Grid container spacing={2.2}>
+          {/* Status breakdown */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper
+              sx={{
+                p: 2.5,
+                borderRadius: 4,
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 4px 20px rgba(15,23,42,0.05)",
+                height: "100%",
+              }}
+            >
+              <Typography sx={{ fontWeight: 800, color: "#0f172a", mb: 0.5 }}>
+                Appointments by status
+              </Typography>
+              <Typography sx={{ color: "#64748b", fontSize: 13.5, mb: 2.5 }}>
+                All-time breakdown
+              </Typography>
+              <Stack spacing={1.8}>
+                {Object.entries(byStatus).map(([key, val]) => {
+                  const color = statusColors[key] || "#64748b";
+                  const pct   = Math.round((val / totalByStatus) * 100);
+                  const labels = {
+                    confirmed: "Confirmed",
+                    completed: "Completed",
+                    cancelled: "Cancelled",
+                    no_show:   "No show",
+                  };
+                  return (
+                    <Box key={key}>
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        sx={{ mb: 0.6 }}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              bgcolor: color,
+                              flexShrink: 0,
+                            }}
+                          />
+                          <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#334155" }}>
+                            {labels[key] || key}
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 14 }}>
+                            {val}
+                          </Typography>
+                          <Typography sx={{ color: "#94a3b8", fontSize: 13 }}>
+                            {pct}%
+                          </Typography>
+                        </Stack>
+                      </Stack>
+                      <LinearProgress
+                        variant="determinate"
+                        value={pct}
+                        sx={{
+                          height: 8,
+                          borderRadius: 999,
+                          bgcolor: "#e2e8f0",
+                          "& .MuiLinearProgress-bar": { borderRadius: 999, bgcolor: color },
+                        }}
+                      />
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Paper>
+          </Grid>
+
+          {/* 7-day trend */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper
+              sx={{
+                p: 2.5,
+                borderRadius: 4,
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 4px 20px rgba(15,23,42,0.05)",
+                height: "100%",
+              }}
+            >
+              <Typography sx={{ fontWeight: 800, color: "#0f172a", mb: 0.5 }}>
+                7-day forecast
+              </Typography>
+              <Typography sx={{ color: "#64748b", fontSize: 13.5, mb: 2.5 }}>
+                Appointment load by day
+              </Typography>
+              <Stack spacing={1.4}>
+                {trend.map((item) => {
+                  const pct = Math.round((item.count / trendMax) * 100);
+                  const d   = new Date(item.date);
+                  const dayLabel = d.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    day: "2-digit",
+                    month: "short",
+                  });
+                  return (
+                    <Stack key={item.date} direction="row" spacing={1.5} alignItems="center">
+                      <Typography
+                        sx={{ minWidth: 80, color: "#64748b", fontSize: 13, fontWeight: 600 }}
+                      >
+                        {dayLabel}
                       </Typography>
-                      <Box sx={{ flex: 1, height: 8, borderRadius: 999, bgcolor: "#f1f5f9", overflow: "hidden" }}>
-                        <Box sx={{ width: `${(day.count / maxWeeklyCount) * 100}%`, height: "100%", borderRadius: 999, bgcolor: i === 0 ? "#0f766e" : "#2563eb", transition: "width 0.4s" }} />
+                      <Box
+                        sx={{
+                          flex: 1,
+                          height: 10,
+                          borderRadius: 999,
+                          bgcolor: "#e2e8f0",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: `${pct}%`,
+                            height: "100%",
+                            borderRadius: 999,
+                            background: "linear-gradient(90deg, #0f766e, #2563eb)",
+                          }}
+                        />
                       </Box>
-                      <Typography sx={{ minWidth: 18, fontWeight: 800, color: "#0f172a", fontSize: 13, textAlign: "right" }}>
-                        {day.count}
+                      <Typography
+                        sx={{ minWidth: 20, fontWeight: 800, color: "#0f172a", fontSize: 14 }}
+                      >
+                        {item.count}
                       </Typography>
                     </Stack>
-                  ))}
-                </Stack>
-              </Paper>
+                  );
+                })}
+              </Stack>
+            </Paper>
+          </Grid>
 
-              {/* SCHEDULE SUMMARY */}
-              {schedules.length > 0 && (
-                <Paper sx={{ p: 2.5, borderRadius: 4, border: "1px solid #e2e8f0", boxShadow: "0 4px 24px rgba(15,23,42,0.05)" }}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                    <CalendarMonthRoundedIcon sx={{ color: "#7c3aed", fontSize: 20 }} />
-                    <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 16 }}>Work schedule</Typography>
-                  </Stack>
-                  <Stack spacing={1}>
-                    {schedules
-                      .filter(s => s.is_active)
-                      .sort((a, b) => (a.day_of_week ?? 0) - (b.day_of_week ?? 0))
-                      .slice(0, 5)
-                      .map((s) => {
-                        const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-                        return (
-                          <Stack key={s.id} direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.6, borderBottom: "1px solid #f1f5f9" }}>
-                            <Typography sx={{ fontWeight: 700, color: "#334155", fontSize: 13.5 }}>
-                              {dayNames[s.day_of_week] || `Day ${s.day_of_week}`}
-                            </Typography>
-                            <Typography sx={{ color: "#64748b", fontSize: 13 }}>
-                              {String(s.start_time).slice(0, 5)} – {String(s.end_time).slice(0, 5)}
-                            </Typography>
-                          </Stack>
-                        );
-                    })}
-                  </Stack>
-                  <Button fullWidth onClick={() => navigate("/doctor/schedule")} endIcon={<ArrowForwardRoundedIcon />} sx={{ mt: 1.5, textTransform: "none", fontWeight: 700, color: "#7c3aed", fontSize: 13 }}>
-                    View full schedule
-                  </Button>
-                </Paper>
-              )}
-            </Stack>
+          {/* Recent appointments */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper
+              sx={{
+                p: 2.5,
+                borderRadius: 4,
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 4px 20px rgba(15,23,42,0.05)",
+                height: "100%",
+              }}
+            >
+              <Typography sx={{ fontWeight: 800, color: "#0f172a", mb: 0.5 }}>
+                Recent appointments
+              </Typography>
+              <Typography sx={{ color: "#64748b", fontSize: 13.5, mb: 2 }}>
+                Last 6 records
+              </Typography>
+              <Stack spacing={1.2}>
+                {recent.length === 0 ? (
+                  <Typography sx={{ color: "#94a3b8", fontSize: 14 }}>No records yet</Typography>
+                ) : (
+                  recent.map((item) => (
+                    <Stack
+                      key={item.id}
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      sx={{
+                        p: 1.3,
+                        borderRadius: 3,
+                        bgcolor: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          sx={{
+                            fontWeight: 700,
+                            color: "#0f172a",
+                            fontSize: 13.5,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {item.patient_name || `Patient #${item.patient}`}
+                        </Typography>
+                        <Typography sx={{ color: "#94a3b8", fontSize: 12.5 }}>
+                          {new Intl.DateTimeFormat("ru-RU", {
+                            day: "2-digit",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }).format(new Date(item.date))}
+                        </Typography>
+                      </Box>
+                      <StatusChip status={item.status} />
+                    </Stack>
+                  ))
+                )}
+              </Stack>
+            </Paper>
           </Grid>
         </Grid>
       </Stack>
     </Box>
   );
 }
-
-export default DoctorDashboard;

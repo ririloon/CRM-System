@@ -1,27 +1,22 @@
 import {
   Alert,
-  Avatar,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Divider,
   Paper,
   Stack,
-  Tab,
-  Tabs,
   Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 
-import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import CalendarTodayRoundedIcon from "@mui/icons-material/CalendarTodayRounded";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
-import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import Grid from "@mui/material/Grid";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import api from "../../services/api";
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function toMinutes(t) {
   if (!t) return 0;
@@ -29,129 +24,137 @@ function toMinutes(t) {
   return h * 60 + m;
 }
 
-function formatTime(v) {
-  if (!v) return "—";
-  return String(v).slice(0, 5);
+function apptMinutes(dateVal) {
+  const d = new Date(dateVal);
+  return d.getHours() * 60 + d.getMinutes();
 }
 
-function formatApptTime(v) {
-  if (!v) return "—";
-  return new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(new Date(v));
+function fmt(t) {
+  return t ? String(t).slice(0, 5) : "—";
 }
 
-function formatDate(v) {
+function fmtDateTime(v) {
   if (!v) return "—";
-  return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short" }).format(new Date(v));
+  return new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit", minute: "2-digit",
+    day: "2-digit", month: "short",
+  }).format(new Date(v));
 }
 
-function getStatusMeta(s) {
+function StatusChip({ status }) {
   const map = {
     scheduled: { label: "Scheduled", bg: "#dbeafe", color: "#1d4ed8" },
     confirmed: { label: "Confirmed", bg: "#dcfce7", color: "#166534" },
-    completed: { label: "Completed", bg: "#ede9fe", color: "#5b21b6" },
+    completed: { label: "Completed", bg: "#ede9fe", color: "#6d28d9" },
     cancelled: { label: "Cancelled", bg: "#fee2e2", color: "#b91c1c" },
-    no_show: { label: "No show", bg: "#fef3c7", color: "#92400e" },
+    no_show:   { label: "No show",   bg: "#fef3c7", color: "#92400e" },
   };
-  return map[s] || { label: s || "Unknown", bg: "#e2e8f0", color: "#475569" };
+  const s = map[status] || { label: status || "Unknown", bg: "#e2e8f0", color: "#475569" };
+  return (
+    <Chip
+      label={s.label}
+      size="small"
+      sx={{ bgcolor: s.bg, color: s.color, fontWeight: 700, borderRadius: 999 }}
+    />
+  );
 }
 
-// JS getDay: 0=Sun,1=Mon...6=Sat → normalize to 0=Mon..6=Sun
-function jsWeekdayToIndex(jsDay) {
-  return jsDay === 0 ? 6 : jsDay - 1;
-}
-
-function MySchedule() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+export default function MySchedule() {
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState("");
   const [doctorName, setDoctorName] = useState("");
-  const [schedules, setSchedules] = useState([]);
+  const [schedules, setSchedules]   = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [activeTab, setActiveTab] = useState(0); // 0 = weekly grid, 1 = list
+  const [activeDay, setActiveDay]   = useState(null);
 
-  // Set default tab to today's weekday
-  useEffect(() => {
-    const todayIdx = jsWeekdayToIndex(new Date().getDay());
-    setActiveTab(todayIdx);
-  }, []);
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const [meRes, schedRes, apptRes] = await Promise.all([
+        api.get("auth/me/"),
+        api.get("doctor-schedules/"),
+        api.get("appointments/my/"),
+      ]);
+      setDoctorName(meRes.data?.full_name || meRes.data?.username || "Doctor");
+      setSchedules(Array.isArray(schedRes.data) ? schedRes.data : []);
+      setAppointments(Array.isArray(apptRes.data) ? apptRes.data : []);
+    } catch {
+      setError("Failed to load schedule. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const [meRes, schedulesRes, appointmentsRes] = await Promise.all([
-          api.get("auth/me/"),
-          api.get("doctor-schedules/"),
-          api.get("appointments/my/"),
-        ]);
-        const me = meRes.data || {};
-        setDoctorName(me.full_name || me.username || "Doctor");
-        setSchedules(Array.isArray(schedulesRes.data) ? schedulesRes.data : []);
-        setAppointments(Array.isArray(appointmentsRes.data) ? appointmentsRes.data : []);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load schedule");
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
   }, []);
 
-  // Group appointments by weekday index (0=Mon)
-  const appointmentsByDay = useMemo(() => {
+  // Set today as default active tab
+  useEffect(() => {
+    if (!loading && activeDay === null) {
+      const jsDay = new Date().getDay();
+      const today = jsDay === 0 ? 6 : jsDay - 1;
+      setActiveDay(today);
+    }
+  }, [loading, activeDay]);
+
+  const apptByDay = useMemo(() => {
     const map = {};
     appointments.forEach((a) => {
       if (!a.date) return;
-      const idx = jsWeekdayToIndex(new Date(a.date).getDay());
-      if (!map[idx]) map[idx] = [];
-      map[idx].push(a);
+      const jsDay = new Date(a.date).getDay();
+      const day   = jsDay === 0 ? 6 : jsDay - 1;
+      if (!map[day]) map[day] = [];
+      map[day].push(a);
     });
-    Object.values(map).forEach((arr) => arr.sort((a, b) => new Date(a.date) - new Date(b.date)));
+    Object.keys(map).forEach((k) => {
+      map[k].sort((a, b) => new Date(a.date) - new Date(b.date));
+    });
     return map;
   }, [appointments]);
 
-  // Group schedules by weekday index
-  const schedulesByDay = useMemo(() => {
+  const schedByDay = useMemo(() => {
     const map = {};
     schedules.forEach((s) => {
       const day = Number(s.day_of_week);
       if (!map[day]) map[day] = [];
       map[day].push(s);
     });
-    Object.values(map).forEach((arr) => arr.sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time)));
+    Object.keys(map).forEach((k) => {
+      map[k].sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time));
+    });
     return map;
   }, [schedules]);
 
-  const today = new Date();
-  const todayIdx = jsWeekdayToIndex(today.getDay());
-
-  // Build data per day
-  const days = useMemo(() => {
+  const dayCards = useMemo(() => {
     return DAY_NAMES.map((name, idx) => {
-      const daySchedules = schedulesByDay[idx] || [];
-      const dayAppts = appointmentsByDay[idx] || [];
-      const windows = daySchedules.map((w) => {
-        const wStart = toMinutes(w.start_time);
-        const wEnd = toMinutes(w.end_time);
-        const booked = dayAppts.filter((a) => {
-          const t = new Date(a.date).getHours() * 60 + new Date(a.date).getMinutes();
-          return t >= wStart && t < wEnd;
+      const wins     = schedByDay[idx] || [];
+      const dayAppts = apptByDay[idx]  || [];
+      const windows  = wins.map((win) => {
+        const start = toMinutes(win.start_time);
+        const end   = toMinutes(win.end_time);
+        const inside = dayAppts.filter((a) => {
+          const t = apptMinutes(a.date);
+          return t >= start && t < end;
         });
-        return { ...w, booked };
+        return { ...win, inside };
       });
-      return { idx, name, short: DAY_SHORT[idx], windows, appts: dayAppts, isToday: idx === todayIdx };
+      return { idx, name, windows, dayAppts };
     });
-  }, [schedulesByDay, appointmentsByDay, todayIdx]);
+  }, [schedByDay, apptByDay]);
 
-  const totalAppointments = appointments.length;
-  const totalScheduledDays = schedules.length;
-  const activeDay = days[activeTab];
+  const todayIdx = (() => {
+    const j = new Date().getDay();
+    return j === 0 ? 6 : j - 1;
+  })();
+
+  const activeDayData = dayCards[activeDay ?? todayIdx];
 
   if (loading) {
     return (
       <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
-        <CircularProgress />
+        <CircularProgress sx={{ color: "#0f766e" }} />
       </Box>
     );
   }
@@ -159,298 +162,367 @@ function MySchedule() {
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, background: "#f8fafc", minHeight: "100vh" }}>
       <Stack spacing={3}>
-        {error && <Alert severity="error">{error}</Alert>}
+        {error && (
+          <Alert
+            severity="error"
+            action={
+              <Button size="small" onClick={load} startIcon={<RefreshRoundedIcon />}>
+                Retry
+              </Button>
+            }
+          >
+            {error}
+          </Alert>
+        )}
 
-        {/* HEADER */}
+        {/* ── Header ── */}
         <Paper
           sx={{
-            p: { xs: 2.5, md: 3.5 },
+            p: { xs: 2.5, md: 3 },
             borderRadius: 5,
-            color: "#fff",
-            overflow: "hidden",
-            position: "relative",
-            background: "linear-gradient(135deg, #1d4ed8 0%, #0f172a 55%, #0f766e 100%)",
-            boxShadow: "0 20px 50px rgba(15,23,42,0.18)",
+            border: "1px solid #e2e8f0",
+            background: "linear-gradient(180deg, #fff 0%, #f8fafc 100%)",
+            boxShadow: "0 4px 24px rgba(15,23,42,0.06)",
           }}
         >
-          <Box sx={{ position: "absolute", right: -40, top: -40, width: 200, height: 200, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.05)" }} />
-          <Box sx={{ position: "absolute", right: 80, bottom: -60, width: 160, height: 160, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.04)" }} />
-          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} sx={{ position: "relative", zIndex: 1 }}>
-            <Box>
-              <Typography sx={{ opacity: 0.72, fontSize: 12.5, mb: 0.8, textTransform: "uppercase", letterSpacing: 0.8 }}>Doctor planner</Typography>
-              <Typography sx={{ fontSize: { xs: 24, md: 30 }, fontWeight: 800, mb: 0.8, lineHeight: 1.2 }}>Weekly Schedule</Typography>
-              <Typography sx={{ opacity: 0.88, fontSize: 14, fontWeight: 600 }}>{doctorName}</Typography>
-            </Box>
-            <Stack direction="row" spacing={2} sx={{ flexShrink: 0 }}>
-              <Box sx={{ textAlign: "center" }}>
-                <Typography sx={{ fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{totalAppointments}</Typography>
-                <Typography sx={{ opacity: 0.75, fontSize: 12 }}>Total booked</Typography>
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", md: "center" }}
+            spacing={2}
+          >
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Box
+                sx={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 3,
+                  bgcolor: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  display: "grid",
+                  placeItems: "center",
+                  color: "#0f766e",
+                }}
+              >
+                <CalendarMonthRoundedIcon sx={{ fontSize: 26 }} />
               </Box>
-              <Divider orientation="vertical" flexItem sx={{ borderColor: "rgba(255,255,255,0.2)" }} />
-              <Box sx={{ textAlign: "center" }}>
-                <Typography sx={{ fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{totalScheduledDays}</Typography>
-                <Typography sx={{ opacity: 0.75, fontSize: 12 }}>Schedule slots</Typography>
+              <Box>
+                <Typography sx={{ fontSize: 13, color: "#64748b" }}>Doctor planner</Typography>
+                <Typography sx={{ fontSize: { xs: 22, md: 28 }, fontWeight: 800, color: "#0f172a" }}>
+                  Weekly Schedule
+                </Typography>
+                <Typography sx={{ color: "#475569", fontSize: 14 }}>{doctorName}</Typography>
+              </Box>
+            </Stack>
+
+            <Stack direction="row" spacing={1.5}>
+              <Box sx={{ px: 2, py: 1, borderRadius: 3, bgcolor: "#ecfdf5", border: "1px solid #bbf7d0" }}>
+                <Typography sx={{ fontWeight: 800, color: "#0f766e", fontSize: 20 }}>
+                  {appointments.length}
+                </Typography>
+                <Typography sx={{ color: "#16a34a", fontSize: 12 }}>total booked</Typography>
+              </Box>
+              <Box sx={{ px: 2, py: 1, borderRadius: 3, bgcolor: "#f0f9ff", border: "1px solid #bae6fd" }}>
+                <Typography sx={{ fontWeight: 800, color: "#0369a1", fontSize: 20 }}>
+                  {dayCards.filter((d) => d.windows.length > 0).length}
+                </Typography>
+                <Typography sx={{ color: "#0284c7", fontSize: 12 }}>active days</Typography>
               </Box>
             </Stack>
           </Stack>
         </Paper>
 
-        {/* DAY TABS */}
-        <Paper sx={{ borderRadius: 4, border: "1px solid #e2e8f0", boxShadow: "0 4px 24px rgba(15,23,42,0.05)", overflow: "hidden" }}>
-          <Box sx={{ borderBottom: "1px solid #e2e8f0", px: 1 }}>
-            <Tabs
-              value={activeTab}
-              onChange={(_, v) => setActiveTab(v)}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{
-                minHeight: 52,
-                "& .MuiTab-root": { minHeight: 52, textTransform: "none", fontWeight: 700, fontSize: 13.5, minWidth: 90 },
-                "& .Mui-selected": { color: "#0f766e !important" },
-                "& .MuiTabs-indicator": { bgcolor: "#0f766e", height: 3, borderRadius: 999 },
-              }}
-            >
-              {days.map((day) => (
-                <Tab
+        {/* ── Day tabs ── */}
+        <Paper
+          sx={{
+            borderRadius: 4,
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 4px 20px rgba(15,23,42,0.05)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Tab bar */}
+          <Box
+            sx={{
+              display: "flex",
+              overflowX: "auto",
+              borderBottom: "1px solid #e2e8f0",
+              bgcolor: "#f8fafc",
+              px: 1,
+              gap: 0.5,
+              py: 1,
+              "&::-webkit-scrollbar": { height: 4 },
+            }}
+          >
+            {dayCards.map((day) => {
+              const isActive  = day.idx === (activeDay ?? todayIdx);
+              const isToday   = day.idx === todayIdx;
+              return (
+                <Button
                   key={day.idx}
-                  label={
-                    <Stack alignItems="center" spacing={0.2}>
-                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: "inherit" }}>{day.short}</Typography>
-                      {day.appts.length > 0 && (
-                        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: day.isToday ? "#0f766e" : "#2563eb" }} />
-                      )}
-                    </Stack>
-                  }
+                  onClick={() => setActiveDay(day.idx)}
                   sx={{
-                    position: "relative",
-                    ...(day.isToday && {
-                      "&::after": {
-                        content: '"TODAY"',
-                        position: "absolute",
-                        top: 4,
-                        right: 4,
-                        fontSize: 8,
-                        fontWeight: 800,
-                        color: "#0f766e",
-                        letterSpacing: 0.5,
-                      },
-                    }),
+                    flexShrink: 0,
+                    borderRadius: 3,
+                    px: 2,
+                    py: 1,
+                    textTransform: "none",
+                    fontWeight: isActive ? 800 : 600,
+                    color: isActive ? "#fff" : "#475569",
+                    bgcolor: isActive ? "#0f766e" : "transparent",
+                    minWidth: 90,
+                    "&:hover": {
+                      bgcolor: isActive ? "#0f766e" : "#e2e8f0",
+                    },
                   }}
-                />
-              ))}
-            </Tabs>
+                >
+                  <Stack alignItems="center" spacing={0.3}>
+                    <Typography sx={{ fontSize: 13, fontWeight: "inherit", color: "inherit" }}>
+                      {day.name.slice(0, 3)}
+                    </Typography>
+                    {isToday && (
+                      <Box
+                        sx={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: "50%",
+                          bgcolor: isActive ? "#fff" : "#0f766e",
+                        }}
+                      />
+                    )}
+                    {day.dayAppts.length > 0 && (
+                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "inherit", opacity: 0.8 }}>
+                        {day.dayAppts.length} pts
+                      </Typography>
+                    )}
+                  </Stack>
+                </Button>
+              );
+            })}
           </Box>
 
-          {/* DAY CONTENT */}
-          <Box sx={{ p: 2.5 }}>
-            {activeDay && (
-              <Stack spacing={2}>
-                {/* Day header */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Box
+          {/* Active day content */}
+          <Box sx={{ p: { xs: 2, md: 2.5 } }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: 2.5 }}
+            >
+              <Box>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 18 }}>
+                    {activeDayData?.name}
+                  </Typography>
+                  {activeDayData?.idx === todayIdx && (
+                    <Chip
+                      label="TODAY"
+                      size="small"
                       sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 3,
-                        bgcolor: activeDay.isToday ? "#0f766e" : "#1d4ed8",
-                        display: "grid",
-                        placeItems: "center",
+                        bgcolor: "#0f766e",
+                        color: "#fff",
+                        fontWeight: 800,
+                        fontSize: 11,
+                        borderRadius: 999,
+                        height: 22,
+                      }}
+                    />
+                  )}
+                </Stack>
+                <Typography sx={{ color: "#64748b", fontSize: 13.5, mt: 0.3 }}>
+                  {activeDayData?.windows.length > 0
+                    ? `${activeDayData.windows.length} schedule window${activeDayData.windows.length > 1 ? "s" : ""} · ${activeDayData.dayAppts.length} patient${activeDayData.dayAppts.length !== 1 ? "s" : ""} booked`
+                    : "No schedule configured for this day"}
+                </Typography>
+              </Box>
+              <Chip
+                label={`${activeDayData?.dayAppts.length || 0} booked`}
+                size="small"
+                sx={{
+                  fontWeight: 700,
+                  bgcolor: activeDayData?.dayAppts.length > 0 ? "#ecfdf5" : "#f1f5f9",
+                  color:   activeDayData?.dayAppts.length > 0 ? "#166534" : "#64748b",
+                  borderRadius: 999,
+                }}
+              />
+            </Stack>
+
+            {activeDayData?.windows.length === 0 ? (
+              <Box
+                sx={{
+                  py: 5,
+                  textAlign: "center",
+                  border: "1px dashed #cbd5e1",
+                  borderRadius: 3,
+                }}
+              >
+                <Typography sx={{ color: "#94a3b8", fontSize: 14 }}>
+                  No schedule windows configured for this day
+                </Typography>
+              </Box>
+            ) : (
+              <Stack spacing={2}>
+                {activeDayData.windows.map((win) => (
+                  <Box
+                    key={win.id}
+                    sx={{
+                      borderRadius: 4,
+                      border: "1px solid #e2e8f0",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {/* Window header */}
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      justifyContent="space-between"
+                      alignItems={{ xs: "flex-start", sm: "center" }}
+                      spacing={1}
+                      sx={{
+                        px: 2.5,
+                        py: 1.8,
+                        bgcolor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
                       }}
                     >
-                      <CalendarTodayRoundedIcon sx={{ fontSize: 20, color: "#fff" }} />
-                    </Box>
-                    <Box>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 20 }}>
-                          {activeDay.name}
+                      <Box>
+                        <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 16 }}>
+                          {fmt(win.start_time)} — {fmt(win.end_time)}
                         </Typography>
-                        {activeDay.isToday && (
-                          <Chip label="Today" size="small" sx={{ bgcolor: "#dcfce7", color: "#166534", fontWeight: 700, fontSize: 11 }} />
+                        {win.slot_duration && (
+                          <Typography sx={{ color: "#64748b", fontSize: 13 }}>
+                            Slot duration: {win.slot_duration} min
+                          </Typography>
                         )}
-                      </Stack>
-                      <Typography sx={{ color: "#64748b", fontSize: 13 }}>
-                        {activeDay.windows.length} time window{activeDay.windows.length !== 1 ? "s" : ""} · {activeDay.appts.length} appointment{activeDay.appts.length !== 1 ? "s" : ""}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Stack>
-
-                {activeDay.windows.length === 0 ? (
-                  /* No schedule configured */
-                  <Box sx={{ py: 6, display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
-                    <EventBusyRoundedIcon sx={{ fontSize: 48, color: "#cbd5e1" }} />
-                    <Typography sx={{ color: "#94a3b8", fontWeight: 700, fontSize: 15 }}>No schedule configured</Typography>
-                    <Typography sx={{ color: "#cbd5e1", fontSize: 13 }}>Add a schedule entry for this day</Typography>
-                  </Box>
-                ) : (
-                  <Stack spacing={2}>
-                    {activeDay.windows.map((window) => (
-                      <Paper
-                        key={window.id}
-                        variant="outlined"
-                        sx={{
-                          borderRadius: 3.5,
-                          border: "1px solid #e2e8f0",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {/* Window header */}
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="center"
+                      </Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          size="small"
+                          label={win.is_active !== false ? "Active" : "Inactive"}
                           sx={{
-                            px: 2.2,
-                            py: 1.5,
-                            bgcolor: window.is_active ? "#f0fdf4" : "#f8fafc",
-                            borderBottom: "1px solid #e2e8f0",
+                            fontWeight: 700,
+                            borderRadius: 999,
+                            bgcolor: win.is_active !== false ? "#dcfce7" : "#fee2e2",
+                            color:   win.is_active !== false ? "#166534" : "#b91c1c",
+                          }}
+                        />
+                        <Chip
+                          size="small"
+                          label={`${win.inside.length} patients`}
+                          sx={{
+                            fontWeight: 700,
+                            borderRadius: 999,
+                            bgcolor: win.inside.length > 0 ? "#eff6ff" : "#f1f5f9",
+                            color:   win.inside.length > 0 ? "#1d4ed8" : "#64748b",
+                          }}
+                        />
+                      </Stack>
+                    </Stack>
+
+                    {/* Patients inside window */}
+                    <Box sx={{ p: 2 }}>
+                      {win.inside.length === 0 ? (
+                        <Box
+                          sx={{
+                            py: 2.5,
+                            textAlign: "center",
+                            border: "1px dashed #e2e8f0",
+                            borderRadius: 3,
                           }}
                         >
-                          <Stack direction="row" spacing={1.5} alignItems="center">
-                            <AccessTimeRoundedIcon sx={{ fontSize: 18, color: window.is_active ? "#0f766e" : "#94a3b8" }} />
-                            <Box>
-                              <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 15 }}>
-                                {formatTime(window.start_time)} – {formatTime(window.end_time)}
-                              </Typography>
-                              <Typography sx={{ color: "#64748b", fontSize: 12.5 }}>
-                                {window.slot_duration} min slots
-                              </Typography>
-                            </Box>
-                          </Stack>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Chip
-                              size="small"
-                              label={`${window.booked.length} booked`}
-                              sx={{
-                                fontWeight: 700,
-                                bgcolor: window.booked.length > 0 ? "#dcfce7" : "#f1f5f9",
-                                color: window.booked.length > 0 ? "#166534" : "#475569",
-                                fontSize: 12,
-                              }}
-                            />
-                            <Chip
-                              size="small"
-                              icon={<CheckCircleRoundedIcon sx={{ fontSize: "14px !important" }} />}
-                              label={window.is_active ? "Active" : "Inactive"}
-                              sx={{
-                                fontWeight: 700,
-                                bgcolor: window.is_active ? "#dbeafe" : "#f1f5f9",
-                                color: window.is_active ? "#1d4ed8" : "#94a3b8",
-                                fontSize: 12,
-                              }}
-                            />
-                          </Stack>
-                        </Stack>
-
-                        {/* Appointments inside window */}
-                        <Box sx={{ p: 1.8 }}>
-                          {window.booked.length === 0 ? (
-                            <Box sx={{ py: 2.5, display: "flex", flexDirection: "column", alignItems: "center", gap: 0.8 }}>
-                              <Typography sx={{ color: "#94a3b8", fontSize: 13.5, fontWeight: 600 }}>No appointments in this slot</Typography>
-                              <Typography sx={{ color: "#cbd5e1", fontSize: 12.5 }}>Free slots available for booking</Typography>
-                            </Box>
-                          ) : (
-                            <Stack divider={<Divider flexItem sx={{ borderColor: "#f1f5f9" }} />}>
-                              {window.booked.map((appt) => {
-                                const status = getStatusMeta(appt.status);
-                                return (
-                                  <Stack
-                                    key={appt.id}
-                                    direction={{ xs: "column", sm: "row" }}
-                                    justifyContent="space-between"
-                                    alignItems={{ xs: "flex-start", sm: "center" }}
-                                    spacing={1.2}
-                                    sx={{ py: 1.4 }}
-                                  >
-                                    <Stack direction="row" spacing={1.5} alignItems="center">
-                                      <Avatar sx={{ width: 36, height: 36, bgcolor: "#dbeafe", color: "#1d4ed8" }}>
-                                        <PersonOutlineRoundedIcon sx={{ fontSize: 18 }} />
-                                      </Avatar>
-                                      <Box>
-                                        <Typography sx={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}>
-                                          {appt.patient_name || `Patient #${appt.patient}`}
-                                        </Typography>
-                                        {appt.complaint && (
-                                          <Typography sx={{ color: "#64748b", fontSize: 12.5, mt: 0.2 }}>
-                                            {appt.complaint}
-                                          </Typography>
-                                        )}
-                                        <Typography sx={{ color: "#94a3b8", fontSize: 12 }}>
-                                          {formatDate(appt.date)}
-                                        </Typography>
-                                      </Box>
-                                    </Stack>
-                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
-                                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, bgcolor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 2, px: 1.2, py: 0.4 }}>
-                                        <AccessTimeRoundedIcon sx={{ fontSize: 13, color: "#64748b" }} />
-                                        <Typography sx={{ fontWeight: 700, color: "#0f172a", fontSize: 13 }}>
-                                          {formatApptTime(appt.date)}
-                                        </Typography>
-                                      </Box>
-                                      <Chip
-                                        size="small"
-                                        label={status.label}
-                                        sx={{ bgcolor: status.bg, color: status.color, fontWeight: 700, borderRadius: 999, fontSize: 11.5 }}
-                                      />
-                                    </Stack>
-                                  </Stack>
-                                );
-                              })}
-                            </Stack>
-                          )}
+                          <Typography sx={{ color: "#94a3b8", fontSize: 13.5 }}>
+                            No patients booked in this window
+                          </Typography>
                         </Box>
-                      </Paper>
-                    ))}
-                  </Stack>
-                )}
+                      ) : (
+                        <Stack divider={<Divider flexItem />}>
+                          {win.inside.map((appt) => (
+                            <Stack
+                              key={appt.id}
+                              direction={{ xs: "column", sm: "row" }}
+                              justifyContent="space-between"
+                              alignItems={{ xs: "flex-start", sm: "center" }}
+                              spacing={1.5}
+                              sx={{ py: 1.6 }}
+                            >
+                              <Box>
+                                <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+                                  {appt.patient_name || `Patient #${appt.patient}`}
+                                </Typography>
+                                <Typography sx={{ color: "#64748b", fontSize: 13.5 }}>
+                                  {fmtDateTime(appt.date)}
+                                </Typography>
+                                {appt.booking_source && (
+                                  <Typography sx={{ color: "#94a3b8", fontSize: 12.5 }}>
+                                    Booked via: {appt.booking_source}
+                                  </Typography>
+                                )}
+                              </Box>
+                              <StatusChip status={appt.status} />
+                            </Stack>
+                          ))}
+                        </Stack>
+                      )}
+                    </Box>
+                  </Box>
+                ))}
               </Stack>
             )}
           </Box>
         </Paper>
 
-        {/* ALL UPCOMING APPOINTMENTS LIST */}
-        {appointments.filter(a => new Date(a.date) >= new Date()).length > 0 && (
-          <Paper sx={{ p: 2.5, borderRadius: 4, border: "1px solid #e2e8f0", boxShadow: "0 4px 24px rgba(15,23,42,0.05)" }}>
-            <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: 17, mb: 0.4 }}>All upcoming appointments</Typography>
-            <Typography sx={{ color: "#64748b", fontSize: 13.5, mb: 2 }}>Sorted by date across all days</Typography>
-            <Stack divider={<Divider flexItem sx={{ borderColor: "#f1f5f9" }} />}>
+        {/* ── All upcoming ── */}
+        {appointments.filter((a) => new Date(a.date) >= new Date()).length > 0 && (
+          <Paper
+            sx={{
+              borderRadius: 4,
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 4px 20px rgba(15,23,42,0.05)",
+              overflow: "hidden",
+            }}
+          >
+            <Box sx={{ px: 2.5, py: 2, borderBottom: "1px solid #e2e8f0", bgcolor: "#f8fafc" }}>
+              <Typography sx={{ fontWeight: 800, color: "#0f172a" }}>
+                All upcoming appointments
+              </Typography>
+              <Typography sx={{ color: "#64748b", fontSize: 13.5 }}>
+                Sorted by date, all future records
+              </Typography>
+            </Box>
+
+            <Grid container>
               {appointments
-                .filter(a => new Date(a.date) >= new Date())
+                .filter((a) => new Date(a.date) >= new Date())
                 .sort((a, b) => new Date(a.date) - new Date(b.date))
-                .slice(0, 20)
-                .map((appt) => {
-                  const status = getStatusMeta(appt.status);
-                  return (
-                    <Stack key={appt.id} direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5} sx={{ py: 1.5 }}>
-                      <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Avatar sx={{ width: 36, height: 36, bgcolor: "#f1f5f9", color: "#475569" }}>
-                          <PersonOutlineRoundedIcon sx={{ fontSize: 18 }} />
-                        </Avatar>
-                        <Box>
-                          <Typography sx={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}>
-                            {appt.patient_name || `Patient #${appt.patient}`}
-                          </Typography>
-                          <Typography sx={{ color: "#64748b", fontSize: 12.5 }}>
-                            {appt.complaint || "—"}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
-                        <Typography sx={{ color: "#475569", fontSize: 13, fontWeight: 600 }}>
-                          {new Intl.DateTimeFormat("ru-RU", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(appt.date))}
+                .map((appt, idx, arr) => (
+                  <Grid key={appt.id} size={{ xs: 12, md: 6 }}>
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      sx={{
+                        px: 2.5,
+                        py: 1.8,
+                        borderBottom:
+                          idx < arr.length - 1 ? "1px solid #f1f5f9" : "none",
+                        borderRight: { md: idx % 2 === 0 ? "1px solid #f1f5f9" : "none" },
+                      }}
+                    >
+                      <Box>
+                        <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+                          {appt.patient_name || `Patient #${appt.patient}`}
                         </Typography>
-                        <Chip size="small" label={status.label} sx={{ bgcolor: status.bg, color: status.color, fontWeight: 700, borderRadius: 999, fontSize: 11.5 }} />
-                      </Stack>
+                        <Typography sx={{ color: "#64748b", fontSize: 13.5 }}>
+                          {fmtDateTime(appt.date)}
+                        </Typography>
+                      </Box>
+                      <StatusChip status={appt.status} />
                     </Stack>
-                  );
-              })}
-            </Stack>
+                  </Grid>
+                ))}
+            </Grid>
           </Paper>
         )}
       </Stack>
     </Box>
   );
 }
-
-export default MySchedule;

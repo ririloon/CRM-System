@@ -30,23 +30,23 @@ const drawerWidth = 272;
 
 const menuItems = [
   {
-    key: "dashboard",
+    key: "Dashboard",
     icon: <DashboardOutlinedIcon />,
     path: "/doctor",
     end: true,
   },
   {
-    key: "schedule",
+    key: "Schedule",
     icon: <EventAvailableOutlinedIcon />,
     path: "/doctor/schedule",
   },
   {
-    key: "patients",
+    key: "Patients",
     icon: <PeopleAltOutlinedIcon />,
     path: "/doctor/patients",
   },
   {
-    key: "records",
+    key: "Records",
     icon: <LocalHospitalOutlinedIcon />,
     path: "/doctor/records",
   },
@@ -369,17 +369,6 @@ function DoctorLayout() {
                 </Button>
               ))}
             </Paper>
-
-            <IconButton
-              sx={{
-                width: 42,
-                height: 42,
-                background: "rgba(255,255,255,0.55)",
-                border: "1px solid rgba(255,255,255,0.55)",
-              }}
-            >
-              <NotificationsNoneOutlinedIcon />
-            </IconButton>
 
             <Paper
               onClick={handleOpenUserMenu}

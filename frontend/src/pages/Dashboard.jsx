@@ -1,8 +1,6 @@
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   Pie,
@@ -32,12 +30,10 @@ import Grid from "@mui/material/Grid";
 import LocalHospitalOutlinedIcon from "@mui/icons-material/LocalHospitalOutlined";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import PieChartOutlineOutlinedIcon from "@mui/icons-material/PieChartOutlineOutlined";
-import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import TimelineOutlinedIcon from "@mui/icons-material/TimelineOutlined";
 import TodayOutlinedIcon from "@mui/icons-material/TodayOutlined";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 
 const panelSx = {
   backgroundColor: "#ffffff",
@@ -69,7 +65,6 @@ const chartColors = {
   confirmed: "#2563eb",
   completed: "#16a34a",
   cancelled: "#dc2626",
-  no_show: "#d97706",
 };
 
 function Dashboard() {
@@ -78,7 +73,6 @@ function Dashboard() {
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
 
   useEffect(() => {
     api
@@ -90,13 +84,13 @@ function Dashboard() {
       .catch((err) => {
         console.error("dashboard error:", err);
         if (err?.response?.status === 401) {
-          setError(t("dashboard.errors.unauthorized"));
+          setError("You are not authorized to view the dashboard.");
         } else {
-          setError(t("dashboard.errors.load"));
+          setError("Failed to load dashboard data.");
         }
       })
       .finally(() => setLoading(false));
-  }, [t]);
+  }, []);
 
   const metrics = useMemo(() => {
     if (!data) return null;
@@ -124,8 +118,10 @@ function Dashboard() {
       ? Math.round((noShow / totalAppointments) * 100)
       : 0;
 
-    const avgWeekLoadPerDoctor = doctors > 0 ? (week / doctors).toFixed(1) : "0.0";
-    const patientDoctorRatio = doctors > 0 ? (patients / doctors).toFixed(1) : "0.0";
+    const avgWeekLoadPerDoctor =
+      doctors > 0 ? (week / doctors).toFixed(1) : "0.0";
+    const patientDoctorRatio =
+      doctors > 0 ? (patients / doctors).toFixed(1) : "0.0";
     const todayShareOfWeek = week > 0 ? Math.round((today / week) * 100) : 0;
 
     return {
@@ -155,43 +151,34 @@ function Dashboard() {
       return {
         date: item.date,
         count: item.count,
-        label: date.toLocaleDateString(
-          i18n.language === "ky" ? "ky-KG" : i18n.language === "en" ? "en-US" : "ru-RU",
-          { weekday: "short" }
-        ),
+        label: date.toLocaleDateString("en-GB", { weekday: "short" }),
       };
     });
-  }, [data, i18n.language]);
+  }, [data]);
 
   const appointmentsByStatusData = useMemo(() => {
     const statusMap = data?.appointments_by_status || {};
     return [
       {
-        name: t("dashboard.status.confirmed"),
+        name: "Confirmed",
         key: "confirmed",
         value: Number(statusMap.confirmed || 0),
         color: chartColors.confirmed,
       },
       {
-        name: t("dashboard.status.completed"),
+        name: "Completed",
         key: "completed",
         value: Number(statusMap.completed || 0),
         color: chartColors.completed,
       },
       {
-        name: t("dashboard.status.cancelled"),
+        name: "Cancelled",
         key: "cancelled",
         value: Number(statusMap.cancelled || 0),
         color: chartColors.cancelled,
       },
-      {
-        name: t("dashboard.status.no_show"),
-        key: "no_show",
-        value: Number(statusMap.no_show || 0),
-        color: chartColors.no_show,
-      },
     ];
-  }, [data, t]);
+  }, [data]);
 
   const recentAppointments = data?.recent_appointments || [];
   const todaySchedule = data?.today_schedule_preview || [];
@@ -199,13 +186,10 @@ function Dashboard() {
   const formatDateTime = (value) => {
     if (!value) return "-";
     try {
-      return new Date(value).toLocaleString(
-        i18n.language === "ky" ? "ky-KG" : i18n.language === "en" ? "en-US" : "ru-RU",
-        {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }
-      );
+      return new Date(value).toLocaleString("en-GB", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
     } catch {
       return value;
     }
@@ -227,7 +211,20 @@ function Dashboard() {
   };
 
   const getStatusLabel = (status) => {
-    return t(`dashboard.status.${status}`);
+    switch (status) {
+      case "completed":
+        return "Completed";
+      case "confirmed":
+        return "Confirmed";
+      case "cancelled":
+        return "Cancelled";
+      case "no_show":
+        return "No show";
+      case "scheduled":
+        return "Scheduled";
+      default:
+        return status || "Unknown";
+    }
   };
 
   if (loading) {
@@ -261,25 +258,25 @@ function Dashboard() {
   const kpis = [
     {
       key: "patients",
-      title: t("dashboard.kpis.patients"),
+      title: "Patients",
       value: metrics.patients,
       icon: <PeopleAltOutlinedIcon fontSize="small" />,
     },
     {
       key: "doctors",
-      title: t("dashboard.kpis.doctors"),
+      title: "Doctors",
       value: metrics.doctors,
       icon: <LocalHospitalOutlinedIcon fontSize="small" />,
     },
     {
       key: "future",
-      title: t("dashboard.kpis.futureAppointments"),
+      title: "Future appointments",
       value: metrics.future,
       icon: <CalendarMonthOutlinedIcon fontSize="small" />,
     },
     {
       key: "today",
-      title: t("dashboard.kpis.todayAppointments"),
+      title: "Today appointments",
       value: metrics.today,
       icon: <EventAvailableOutlinedIcon fontSize="small" />,
     },
@@ -287,24 +284,24 @@ function Dashboard() {
 
   const insightCards = [
     {
-      title: t("dashboard.insights.completionRate"),
+      title: "Completion rate",
       value: `${metrics.completionRate}%`,
-      note: t("dashboard.insights.completionRateHint"),
+      note: "Share of appointments successfully completed.",
     },
     {
-      title: t("dashboard.insights.cancellationRate"),
+      title: "Cancellation rate",
       value: `${metrics.cancellationRate}%`,
-      note: t("dashboard.insights.cancellationRateHint"),
+      note: "Percentage of appointments cancelled by users or staff.",
     },
     {
-      title: t("dashboard.insights.noShowRate"),
+      title: "No-show rate",
       value: `${metrics.noShowRate}%`,
-      note: t("dashboard.insights.noShowRateHint"),
+      note: "Appointments where the patient did not attend.",
     },
     {
-      title: t("dashboard.insights.weekLoadPerDoctor"),
+      title: "Weekly load per doctor",
       value: metrics.avgWeekLoadPerDoctor,
-      note: t("dashboard.insights.weekLoadPerDoctorHint"),
+      note: "Average number of weekly appointments assigned to each doctor.",
     },
   ];
 
@@ -329,7 +326,7 @@ function Dashboard() {
                 mb: 1,
               }}
             >
-              {t("dashboard.eyebrow")}
+              Admin overview
             </Typography>
 
             <Typography
@@ -341,7 +338,7 @@ function Dashboard() {
                 mb: 1,
               }}
             >
-              {t("dashboard.title")}
+              Healthcare Dashboard
             </Typography>
 
             <Typography
@@ -352,7 +349,8 @@ function Dashboard() {
                 fontSize: 15,
               }}
             >
-              {t("dashboard.subtitle")}
+              Monitor patients, doctors, appointments, operational workload, and
+              scheduling trends from one administrative dashboard.
             </Typography>
           </Grid>
 
@@ -377,7 +375,7 @@ function Dashboard() {
                   minHeight: 46,
                 }}
               >
-                {t("dashboard.actions.newAppointment")}
+                New appointment
               </Button>
 
               <Button
@@ -397,7 +395,7 @@ function Dashboard() {
                   backgroundColor: "#fff",
                 }}
               >
-                {t("dashboard.actions.openPatients")}
+                Open patients
               </Button>
             </Stack>
           </Grid>
@@ -431,9 +429,7 @@ function Dashboard() {
                   </Typography>
                 </Box>
 
-                <Box sx={kpiIconWrap}>
-                  {item.icon}
-                </Box>
+                <Box sx={kpiIconWrap}>{item.icon}</Box>
               </Stack>
             </Paper>
           </Grid>
@@ -450,11 +446,13 @@ function Dashboard() {
               sx={{ mb: 2 }}
             >
               <Box>
-                <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>
-                  {t("dashboard.charts.weeklyTrendTitle")}
+                <Typography
+                  sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}
+                >
+                  Weekly appointment trend
                 </Typography>
                 <Typography sx={{ color: "#64748b", mt: 0.5, fontSize: 14 }}>
-                  {t("dashboard.charts.weeklyTrendSubtitle")}
+                  Appointment volume over the last 7 days.
                 </Typography>
               </Box>
 
@@ -467,9 +465,23 @@ function Dashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={weeklyTrendData}>
                   <defs>
-                    <linearGradient id="weeklyAreaFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.22} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0.02} />
+                    <linearGradient
+                      id="weeklyAreaFill"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="5%"
+                        stopColor="#2563eb"
+                        stopOpacity={0.22}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="#2563eb"
+                        stopOpacity={0.02}
+                      />
                     </linearGradient>
                   </defs>
                   <CartesianGrid vertical={false} stroke="#e2e8f0" />
@@ -514,11 +526,13 @@ function Dashboard() {
               sx={{ mb: 2 }}
             >
               <Box>
-                <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>
-                  {t("dashboard.charts.statusTitle")}
+                <Typography
+                  sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}
+                >
+                  Appointment status
                 </Typography>
                 <Typography sx={{ color: "#64748b", mt: 0.5, fontSize: 14 }}>
-                  {t("dashboard.charts.statusSubtitle")}
+                  Distribution by current appointment state.
                 </Typography>
               </Box>
 
@@ -553,31 +567,61 @@ function Dashboard() {
               </ResponsiveContainer>
             </Box>
 
-            <Stack spacing={1} sx={{ mt: 1 }}>
+            <Stack spacing={1.1} sx={{ mt: 1.5 }}>
               {appointmentsByStatusData.map((item) => (
-                <Stack
+                <Box
                   key={item.key}
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    alignItems: "center",
+                    gap: 2,
+                    px: 1.25,
+                    py: 1,
+                    borderRadius: "12px",
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #e5e7eb",
+                  }}
                 >
-                  <Stack direction="row" spacing={1.25} alignItems="center">
+                  <Stack
+                    direction="row"
+                    spacing={1.25}
+                    alignItems="center"
+                    sx={{ minWidth: 0 }}
+                  >
                     <Box
                       sx={{
                         width: 10,
                         height: 10,
                         borderRadius: "999px",
                         backgroundColor: item.color,
+                        flexShrink: 0,
                       }}
                     />
-                    <Typography sx={{ fontSize: 14, color: "#475569" }}>
+                    <Typography
+                      sx={{
+                        fontSize: 14,
+                        color: "#475569",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {item.name}
                     </Typography>
                   </Stack>
-                  <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+
+                  <Typography
+                    sx={{
+                      minWidth: 24,
+                      textAlign: "right",
+                      fontWeight: 800,
+                      color: "#0f172a",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
                     {item.value}
                   </Typography>
-                </Stack>
+                </Box>
               ))}
             </Stack>
           </Paper>
@@ -588,11 +632,13 @@ function Dashboard() {
         <Grid size={{ xs: 12, lg: 8 }}>
           <Paper sx={{ ...panelSx, p: 3 }}>
             <Box sx={{ mb: 2 }}>
-              <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>
-                {t("dashboard.insights.title")}
+              <Typography
+                sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}
+              >
+                Operational insights
               </Typography>
               <Typography sx={{ color: "#64748b", mt: 0.5, fontSize: 14 }}>
-                {t("dashboard.insights.subtitle")}
+                Key ratios and performance indicators for the current period.
               </Typography>
             </Box>
 
@@ -614,7 +660,9 @@ function Dashboard() {
                     >
                       {item.value}
                     </Typography>
-                    <Typography sx={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
+                    <Typography
+                      sx={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}
+                    >
                       {item.note}
                     </Typography>
                   </Box>
@@ -627,38 +675,46 @@ function Dashboard() {
         <Grid size={{ xs: 12, lg: 4 }}>
           <Paper sx={{ ...panelSx, p: 3, height: "100%" }}>
             <Box sx={{ mb: 2 }}>
-              <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>
-                {t("dashboard.capacity.title")}
+              <Typography
+                sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}
+              >
+                Capacity snapshot
               </Typography>
               <Typography sx={{ color: "#64748b", mt: 0.5, fontSize: 14 }}>
-                {t("dashboard.capacity.subtitle")}
+                Quick view of workload balance across the clinic.
               </Typography>
             </Box>
 
             <Stack spacing={1.5}>
               <Box sx={{ ...subtleCardSx, p: 2 }}>
                 <Typography sx={{ fontSize: 13, color: "#64748b", mb: 1 }}>
-                  {t("dashboard.capacity.patientDoctorRatio")}
+                  Patient-to-doctor ratio
                 </Typography>
-                <Typography sx={{ fontSize: 26, fontWeight: 800, color: "#0f172a" }}>
+                <Typography
+                  sx={{ fontSize: 26, fontWeight: 800, color: "#0f172a" }}
+                >
                   {metrics.patientDoctorRatio}
                 </Typography>
               </Box>
 
               <Box sx={{ ...subtleCardSx, p: 2 }}>
                 <Typography sx={{ fontSize: 13, color: "#64748b", mb: 1 }}>
-                  {t("dashboard.capacity.avgWeekLoad")}
+                  Average weekly load
                 </Typography>
-                <Typography sx={{ fontSize: 26, fontWeight: 800, color: "#0f172a" }}>
+                <Typography
+                  sx={{ fontSize: 26, fontWeight: 800, color: "#0f172a" }}
+                >
                   {metrics.avgWeekLoadPerDoctor}
                 </Typography>
               </Box>
 
               <Box sx={{ ...subtleCardSx, p: 2 }}>
                 <Typography sx={{ fontSize: 13, color: "#64748b", mb: 1 }}>
-                  {t("dashboard.capacity.todayShare")}
+                  Today share of weekly volume
                 </Typography>
-                <Typography sx={{ fontSize: 26, fontWeight: 800, color: "#0f172a" }}>
+                <Typography
+                  sx={{ fontSize: 26, fontWeight: 800, color: "#0f172a" }}
+                >
                   {metrics.todayShareOfWeek}%
                 </Typography>
               </Box>
@@ -671,11 +727,13 @@ function Dashboard() {
         <Grid size={{ xs: 12, lg: 7 }}>
           <Paper sx={{ ...panelSx, overflow: "hidden" }}>
             <Box sx={{ px: 3, py: 2.5 }}>
-              <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>
-                {t("dashboard.recent.title")}
+              <Typography
+                sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}
+              >
+                Recent appointments
               </Typography>
               <Typography sx={{ color: "#64748b", mt: 0.5, fontSize: 14 }}>
-                {t("dashboard.recent.subtitle")}
+                Latest appointment activity across the system.
               </Typography>
             </Box>
 
@@ -684,7 +742,7 @@ function Dashboard() {
             {recentAppointments.length === 0 ? (
               <Box sx={{ p: 3 }}>
                 <Typography sx={{ color: "#64748b" }}>
-                  {t("dashboard.recent.empty")}
+                  No recent appointments available.
                 </Typography>
               </Box>
             ) : (
@@ -695,7 +753,10 @@ function Dashboard() {
                     px: 3,
                     py: 2,
                     display: "grid",
-                    gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr 1fr auto" },
+                    gridTemplateColumns: {
+                      xs: "1fr",
+                      md: "1.2fr 1fr 1fr auto",
+                    },
                     gap: 2,
                     alignItems: "center",
                     borderBottom:
@@ -709,7 +770,7 @@ function Dashboard() {
                       {item.patient_name}
                     </Typography>
                     <Typography sx={{ fontSize: 13, color: "#64748b" }}>
-                      {t("dashboard.recent.patient")}
+                      Patient
                     </Typography>
                   </Box>
 
@@ -718,7 +779,7 @@ function Dashboard() {
                       {item.doctor_name}
                     </Typography>
                     <Typography sx={{ fontSize: 13, color: "#64748b" }}>
-                      {t("dashboard.recent.doctor")}
+                      Doctor
                     </Typography>
                   </Box>
 
@@ -727,7 +788,7 @@ function Dashboard() {
                       {formatDateTime(item.date)}
                     </Typography>
                     <Typography sx={{ fontSize: 13, color: "#64748b" }}>
-                      {t("dashboard.recent.time")}
+                      Date & time
                     </Typography>
                   </Box>
 
@@ -758,11 +819,13 @@ function Dashboard() {
                 sx={{ mb: 2 }}
               >
                 <Box>
-                  <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>
-                    {t("dashboard.todaySchedule.title")}
+                  <Typography
+                    sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}
+                  >
+                    Today schedule
                   </Typography>
                   <Typography sx={{ color: "#64748b", mt: 0.5, fontSize: 14 }}>
-                    {t("dashboard.todaySchedule.subtitle")}
+                    Preview of appointments planned for today.
                   </Typography>
                 </Box>
 
@@ -773,7 +836,7 @@ function Dashboard() {
 
               {todaySchedule.length === 0 ? (
                 <Typography sx={{ color: "#64748b" }}>
-                  {t("dashboard.todaySchedule.empty")}
+                  No appointments scheduled for today.
                 </Typography>
               ) : (
                 <Stack spacing={1.25}>
@@ -786,10 +849,14 @@ function Dashboard() {
                         spacing={2}
                       >
                         <Box>
-                          <Typography sx={{ fontWeight: 700, color: "#0f172a", mb: 0.5 }}>
+                          <Typography
+                            sx={{ fontWeight: 700, color: "#0f172a", mb: 0.5 }}
+                          >
                             {item.patient_name}
                           </Typography>
-                          <Typography sx={{ fontSize: 13, color: "#64748b", mb: 0.25 }}>
+                          <Typography
+                            sx={{ fontSize: 13, color: "#64748b", mb: 0.25 }}
+                          >
                             {item.doctor_name}
                           </Typography>
                           <Typography sx={{ fontSize: 13, color: "#64748b" }}>
@@ -811,8 +878,10 @@ function Dashboard() {
             </Paper>
 
             <Paper sx={{ ...panelSx, p: 3 }}>
-              <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a", mb: 2 }}>
-                {t("dashboard.actionsPanel.title")}
+              <Typography
+                sx={{ fontSize: 20, fontWeight: 800, color: "#0f172a", mb: 2 }}
+              >
+                Quick actions
               </Typography>
 
               <Stack spacing={1.25}>
@@ -829,7 +898,7 @@ function Dashboard() {
                     justifyContent: "space-between",
                   }}
                 >
-                  {t("dashboard.actionsPanel.createAppointment")}
+                  Create appointment
                 </Button>
 
                 <Button
@@ -847,7 +916,7 @@ function Dashboard() {
                     backgroundColor: "#fff",
                   }}
                 >
-                  {t("dashboard.actionsPanel.openPatients")}
+                  Open patients
                 </Button>
 
                 <Button
@@ -865,14 +934,17 @@ function Dashboard() {
                     backgroundColor: "#fff",
                   }}
                 >
-                  {t("dashboard.actionsPanel.openDoctors")}
+                  Open doctors
                 </Button>
               </Stack>
 
               <Divider sx={{ my: 2 }} />
 
-              <Typography sx={{ fontSize: 13, color: "#64748b", lineHeight: 1.7 }}>
-                {t("dashboard.actionsPanel.note")}
+              <Typography
+                sx={{ fontSize: 13, color: "#64748b", lineHeight: 1.7 }}
+              >
+                Use this dashboard to monitor clinic activity, track appointment
+                flow, and quickly navigate to operational sections.
               </Typography>
             </Paper>
           </Stack>
